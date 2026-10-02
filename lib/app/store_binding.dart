@@ -5,13 +5,14 @@ import '../data/mock_repositories.dart';
 import '../domain/repositories.dart';
 import 'store_controller.dart';
 import 'store_navigation_controller.dart';
+import '../data/firebase_account_repository.dart';
 
 /// 앱에서 사용하는 저장소와 GetX 컨트롤러의 생성 책임을 모읍니다.
 class StoreBinding extends Bindings {
   @override
   void dependencies() {
     Get.lazyPut<ProductRepository>(() => MockProductRepository());
-    Get.lazyPut<AccountRepository>(() => MockAccountRepository());
+    Get.lazyPut<AccountRepository>(() => FirebaseAccountRepository());
     Get.lazyPut<OrderRepository>(() => MockOrderRepository());
     Get.lazyPut<ReviewRepository>(() => MockReviewRepository());
     Get.lazyPut<ShoppingRepository>(() => MockShoppingRepository());

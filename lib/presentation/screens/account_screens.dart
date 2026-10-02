@@ -32,7 +32,7 @@ class ProfileScreen extends StatelessWidget {
           child: const LText('로그인 / 회원가입'),
         ),
       ] else ...[
-        const SectionTitle('서준 님'),
+        SectionTitle('${store.userName ?? '사용자'} 님'),
         const LText('PLATINUM MEMBER · 다음 VIP까지 128,000원'),
         const SizedBox(height: 16),
         Card(
@@ -40,10 +40,15 @@ class ProfileScreen extends StatelessWidget {
             padding: const EdgeInsets.all(20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
+              children: [
                 LText(
-                  'SJ',
-                  style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold),
+                  (store.userName ?? 'U')
+                      .trim()
+                      .split(RegExp(r'\s+'))
+                      .where((word) => word.isNotEmpty)
+                      .map((word) => word[0].toUpperCase())
+                      .take(2)
+                      .join(),
                 ),
                 LText('VIP 등급 78%'),
                 LText('PLATINUM'),
@@ -322,21 +327,39 @@ class _AuthScreenState extends State<AuthScreen> {
         const LText('간편 로그인', textAlign: TextAlign.center),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: const [
-            IconButton(
+          children: [
+            const IconButton(
               onPressed: null,
               tooltip: '카카오 로그인 준비 중',
               icon: LText('K'),
             ),
-            IconButton(
+            const IconButton(
               onPressed: null,
               tooltip: '네이버 로그인 준비 중',
               icon: LText('N'),
             ),
             IconButton(
-              onPressed: null,
-              tooltip: '구글 로그인 준비 중',
-              icon: LText('G'),
+              onPressed: busy
+                  ? null
+                  : () async {
+                      setState(() => busy = true);
+
+                      try {
+                        final ok = await widget.store.signInWithGoogle();
+
+                        if (ok) {
+                          widget.onDone();
+                        } else {
+                          widget.onMessage('Google 로그인에 실패했습니다.');
+                        }
+                      } finally {
+                        if (mounted) {
+                          setState(() => busy = false);
+                        }
+                      }
+                    },
+              tooltip: 'Google 로그인',
+              icon: const LText('G'),
             ),
           ],
         ),

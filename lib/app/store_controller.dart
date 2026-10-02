@@ -33,6 +33,8 @@ class StoreController extends GetxController {
   bool loading = true;
   String? loadError;
   bool isLoggedIn = false;
+  String? userName;
+  String? userEmail;
 
   @override
   void onInit() {
@@ -169,10 +171,25 @@ class StoreController extends GetxController {
     return success;
   }
 
+  Future<bool> signInWithGoogle() async {
+    final success = await accountRepository.signInWithGoogle();
+
+    if (success) {
+      isLoggedIn = true;
+      userName = accountRepository.displayName;
+      userEmail = accountRepository.email;
+      update();
+    }
+
+    return success;
+  }
+
   Future<void> signUp(String email, String password) =>
       accountRepository.signUp(email, password);
 
-  void signOut() {
+  Future<void> signOut() async {
+    await accountRepository.signOut();
+
     isLoggedIn = false;
     update();
   }

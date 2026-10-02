@@ -181,16 +181,35 @@ class MockProductRepository implements ProductRepository {
 }
 
 /// 비밀번호를 영구 저장하지 않는 화면 확인용 계정입니다.
+/// 비밀번호를 영구 저장하지 않는 화면 확인용 계정입니다.
 class MockAccountRepository implements AccountRepository {
   final Map<String, String> _accounts = {'user@sole.kr': 'sole1234'};
+
   @override
   Future<bool> signIn(String email, String password) async =>
       _accounts[email] == password;
+
   @override
   Future<void> signUp(String email, String password) async {
-    if (_accounts.containsKey(email)) throw StateError('이미 가입한 이메일입니다.');
+    if (_accounts.containsKey(email)) {
+      throw StateError('이미 가입한 이메일입니다.');
+    }
     _accounts[email] = password;
   }
+
+  @override
+  Future<bool> signInWithGoogle() async {
+    return true;
+  }
+
+  @override
+  Future<void> signOut() async {}
+
+  @override
+  String? get displayName => '테스트 사용자';
+
+  @override
+  String? get email => 'user@sole.kr';
 }
 
 /// 주문의 실제 저장 대신 메모리에서 화면 흐름을 재현합니다.

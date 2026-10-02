@@ -9,6 +9,12 @@ abstract interface class ProductRepository {
 abstract interface class AccountRepository {
   Future<bool> signIn(String email, String password);
   Future<void> signUp(String email, String password);
+
+  Future<bool> signInWithGoogle();
+  Future<void> signOut();
+
+  String? get displayName;
+  String? get email;
 }
 
 /// 주문 생성과 취소는 추후 MySQL 백엔드 API에서 검증해야 합니다.
