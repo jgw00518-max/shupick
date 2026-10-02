@@ -78,7 +78,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       builder: (sheetContext) => MediaQuery(
         data: MediaQuery.of(
           sheetContext,
-        ).copyWith(textScaler: const TextScaler.linear(1.3)),
+        ).copyWith(textScaler: const TextScaler.linear(1.16)),
         child: ProductOptionsSheet(
           product: widget.product,
           store: widget.store,
@@ -1125,7 +1125,7 @@ class _ProductOptionsSheetState extends State<ProductOptionsSheet> {
             ),
             const SizedBox(height: 10),
             const LText(
-              '선택한 색상에 따라 사이즈별 재고와 재입고 가능 여부가 달라집니다.',
+              '색상에 따라 재고·재입고 여부가 달라져요.',
               style: TextStyle(fontSize: 12, color: Colors.grey),
             ),
             const SizedBox(height: 20),

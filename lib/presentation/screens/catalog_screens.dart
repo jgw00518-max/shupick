@@ -105,7 +105,7 @@ class HomeScreen extends StatelessWidget {
         child: SectionTitle('기획전'),
       ),
       SizedBox(
-        height: 176,
+        height: 154,
         child: ListView(
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 18),
@@ -116,15 +116,15 @@ class HomeScreen extends StatelessWidget {
                 child: Padding(
                   padding: const EdgeInsets.only(right: 12),
                   child: SizedBox(
-                    width: 132,
+                    width: 160,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         ClipRRect(
                           borderRadius: BorderRadius.circular(12),
                           child: SizedBox(
-                            width: 132,
-                            height: 100,
+                            width: 160,
+                            height: 110,
                             child: Image.network(
                               _campaignImage(store, entry.value.ids.first),
                               fit: BoxFit.cover,
@@ -134,13 +134,19 @@ class HomeScreen extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 8),
-                        LText(
-                          entry.key,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
+                        SizedBox(
+                          width: 160,
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: LText(
+                              entry.key,
+                              maxLines: 1,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
                           ),
                         ),
                       ],
@@ -367,7 +373,7 @@ class ProductGrid extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: constraints.maxWidth > 700 ? 4 : 2,
-        childAspectRatio: showDetails ? .49 : .62,
+        childAspectRatio: showDetails ? .50 : .64,
         crossAxisSpacing: 12,
         mainAxisSpacing: 12,
       ),
