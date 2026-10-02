@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "358191601152",
+    "project_id": "shupick-71b8f",
+    "storage_bucket": "shupick-71b8f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:358191601152:android:9a277cb27f10c68255aae5",
+        "android_client_info": {
+          "package_name": "com.example.shupick"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "358191601152-nkjisof2opa9fp9hjtdea0urjsbnpvc6.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.shupick",
+            "certificate_hash": "7dd46128957686e7bb9b27eb26bf36fe02addced"
+          }
+        },
+        {
+          "client_id": "358191601152-24g0ecv5i9uhocs303pbubmmvma4me8k.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBdyWyQvYqsbPZpWQG1GMEo4hb8gfCjUlI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "358191601152-24g0ecv5i9uhocs303pbubmmvma4me8k.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "358191601152-vfp4oj25q1gupn0d5r7m2pcm6ui42ka2.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.shupick"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
