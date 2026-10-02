@@ -104,46 +104,54 @@ class _CartScreenState extends State<CartScreen> {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-          child: Row(
+          child: Column(
             children: [
-              Checkbox(
-                value: all,
-                onChanged: (_) => setState(() {
-                  if (all) {
-                    selected.clear();
-                  } else {
-                    selected = items.map((item) => item.key).toSet();
-                  }
-                }),
+              Row(
+                children: [
+                  Checkbox(
+                    value: all,
+                    onChanged: (_) => setState(() {
+                      if (all) {
+                        selected.clear();
+                      } else {
+                        selected = items.map((item) => item.key).toSet();
+                      }
+                    }),
+                  ),
+                  LText('전체 선택 (${selected.length})'),
+                ],
               ),
-              LText('전체 선택 (${selected.length})'),
-              const Spacer(),
-              TextButton(
-                onPressed: selected.isEmpty
-                    ? null
-                    : () async {
-                        if (!await _confirm(
-                          '선택 상품 삭제',
-                          '선택한 상품을 장바구니에서 삭제할까요?',
-                        )) {
-                          return;
-                        }
-                        widget.store.removeCartKeys(Set.of(selected));
-                        setState(selected.clear);
-                      },
-                child: const LText('선택 삭제'),
-              ),
-              TextButton(
-                onPressed: () async {
-                  if (!await _confirm('장바구니 비우기', '장바구니의 모든 상품을 삭제할까요?')) {
-                    return;
-                  }
-                  widget.store.removeCartKeys(
-                    items.map((item) => item.key).toSet(),
-                  );
-                  setState(selected.clear);
-                },
-                child: const LText('전체 삭제'),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: selected.isEmpty
+                        ? null
+                        : () async {
+                            if (!await _confirm(
+                              '선택 상품 삭제',
+                              '선택한 상품을 장바구니에서 삭제할까요?',
+                            )) {
+                              return;
+                            }
+                            widget.store.removeCartKeys(Set.of(selected));
+                            setState(selected.clear);
+                          },
+                    child: const LText('선택 삭제'),
+                  ),
+                  TextButton(
+                    onPressed: () async {
+                      if (!await _confirm('장바구니 비우기', '장바구니의 모든 상품을 삭제할까요?')) {
+                        return;
+                      }
+                      widget.store.removeCartKeys(
+                        items.map((item) => item.key).toSet(),
+                      );
+                      setState(selected.clear);
+                    },
+                    child: const LText('전체 삭제'),
+                  ),
+                ],
               ),
             ],
           ),
@@ -467,7 +475,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           ),
         ] else ...[
           ListTile(
-            title: LText('SOLE $district점'),
+            title: LText('SHUPICK $district점'),
             subtitle: const LText('픽업 대리점'),
             trailing: TextButton(
               onPressed: () => setState(() => step = 1),
@@ -621,7 +629,7 @@ class PickupStoreInfo extends StatelessWidget {
           children: [
             if (!compact)
               LText(
-                'SOLE $district점',
+                'SHUPICK $district점',
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
             LText(
@@ -676,7 +684,7 @@ class OrdersScreen extends StatelessWidget {
               '총 주문 수량 ${order.items.fold(0, (sum, item) => sum + item.quantity)}켤레',
             ),
             LText('최종 결제 금액 ${won(order.total)}'),
-            LText('픽업 대리점 SOLE ${order.district}점'),
+            LText('픽업 대리점 SHUPICK ${order.district}점'),
           ],
         ),
       ),
@@ -714,7 +722,7 @@ class OrdersScreen extends StatelessWidget {
               ],
             ),
           ),
-          LText('SOLE ${order.district}점 직원에게 보여주세요.'),
+          LText('SHUPICK ${order.district}점 직원에게 보여주세요.'),
         ],
       ),
       actions: [

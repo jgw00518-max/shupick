@@ -30,7 +30,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     padding: const EdgeInsets.all(20),
     children: [
       const SectionTitle('설정'),
-      const LText('SOLE/SELECT를 내 방식으로 사용하세요.'),
+      const LText('SHUPICK을 내 방식으로 사용하세요.'),
       const SizedBox(height: 20),
       const SectionTitle('화면'),
       SwitchListTile(

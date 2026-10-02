@@ -71,7 +71,7 @@ class _ShippingScreenState extends State<ShippingScreen> {
     if (order == null) return const EmptyState('조회할 주문이 없습니다.');
     const steps = [
       ('본사 출고 준비', '09.28 09:10', '상품 검수와 포장이 완료되었습니다.'),
-      ('본사 출고', '09.28 14:25', 'SOLE 본사 물류센터에서 출발했습니다.'),
+      ('본사 출고', '09.28 14:25', 'SHUPICK 본사 물류센터에서 출발했습니다.'),
       ('대리점 이동 중', '09.29 08:40', '대리점으로 이동하고 있습니다.'),
       ('대리점 도착', '09.29 13:42', '픽업 장소에 상품이 준비되었습니다.'),
       ('고객 픽업 완료', '픽업 후 반영', '고객에게 상품 전달이 완료되었습니다.'),
@@ -109,7 +109,7 @@ class _ShippingScreenState extends State<ShippingScreen> {
               children: [
                 const LText('픽업 대리점'),
                 LText(
-                  'SOLE ${order.district}점',
+                  'SHUPICK ${order.district}점',
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
                 const LText('서울 성동구 왕십리로 83, 1층'),
@@ -258,7 +258,7 @@ class PointsScreen extends StatelessWidget {
     padding: const EdgeInsets.all(20),
     children: [
       const SectionTitle('적립금'),
-      const LText('쇼핑할수록 쌓이는 SOLE 포인트'),
+      const LText('쇼핑할수록 쌓이는 SHUPICK 포인트'),
       const SizedBox(height: 22),
       Card(
         color: brandBlue,

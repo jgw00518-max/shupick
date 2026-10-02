@@ -28,59 +28,80 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ListView(
     children: [
-      Stack(
-        alignment: Alignment.bottomLeft,
-        children: [
-          SizedBox(
-            height: 310,
-            width: double.infinity,
-            child: Image.network(
-              mockHeroImage,
-              fit: BoxFit.cover,
-              errorBuilder: (_, _, _) =>
-                  const ColoredBox(color: Color(0xFFE7E8E6)),
-            ),
-          ),
-          Container(
-            height: 310,
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Colors.transparent, Color(0xB9000000)],
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      Padding(
+        padding: const EdgeInsets.fromLTRB(12, 6, 12, 0),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: SizedBox(
+            height: 264,
+            child: Stack(
+              fit: StackFit.expand,
               children: [
-                const LText(
-                  'THE EVERYDAY EDIT',
-                  style: TextStyle(color: Colors.white),
+                Image.network(
+                  mockHeroImage,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) =>
+                      const ColoredBox(color: Color(0xFFE7E8E6)),
                 ),
-                const SizedBox(height: 8),
-                const LText(
-                  '오늘의 발걸음,\n나만의 스타일.',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
+                const DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.centerRight,
+                      end: Alignment.bottomLeft,
+                      colors: [Colors.transparent, Color(0x88000000)],
+                    ),
                   ),
                 ),
-                const SizedBox(height: 14),
-                FilledButton(
-                  onPressed: () => onCampaign('매일 신는 좋은 신발'),
-                  child: const LText('컬렉션 보기'),
+                Padding(
+                  padding: const EdgeInsets.all(18),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const LText(
+                        'THE EVERYDAY EDIT',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          letterSpacing: 2,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      const LText(
+                        '오늘의 발걸음,\n나만의 스타일.',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 28,
+                          height: 1.2,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 17),
+                      FilledButton(
+                        onPressed: () => onCampaign('매일 신는 좋은 신발'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: Colors.black87,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 18,
+                            vertical: 14,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const LText('컬렉션 보기'),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
           ),
-        ],
+        ),
       ),
       const Padding(
-        padding: EdgeInsets.fromLTRB(16, 22, 16, 12),
+        padding: EdgeInsets.fromLTRB(18, 26, 18, 16),
         child: SectionTitle('기획전'),
       ),
       Padding(
@@ -144,7 +165,7 @@ class HomeScreen extends StatelessWidget {
       ),
       for (final entry in campaignData.entries) ...[
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 26, 16, 4),
+          padding: const EdgeInsets.fromLTRB(18, 28, 18, 4),
           child: SectionTitle(
             entry.key,
             action: '더 보기 ›',
@@ -152,11 +173,14 @@ class HomeScreen extends StatelessWidget {
           ),
         ),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: LText(entry.value.subtitle),
+          padding: const EdgeInsets.symmetric(horizontal: 18),
+          child: LText(
+            entry.value.subtitle,
+            style: const TextStyle(color: Color(0xFF777777), fontSize: 14),
+          ),
         ),
         Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(18, 16, 10, 0),
           child: Row(
             children: [
               for (final id in entry.value.ids.take(2))
@@ -234,17 +258,24 @@ class _CatalogScreenState extends State<CatalogScreen> {
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(18, 20, 18, 14),
           child: Align(
             alignment: Alignment.centerLeft,
-            child: LText('${widget.initialGender ?? '전체'} · $subcategory'),
+            child: LText(
+              '${widget.initialGender ?? '전체'} · $subcategory',
+              style: const TextStyle(
+                color: Color(0xFF777777),
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ),
         SizedBox(
-          height: 44,
+          height: 42,
           child: ListView(
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 18),
             children: [
               for (final value in [
                 '전체',
@@ -252,17 +283,26 @@ class _CatalogScreenState extends State<CatalogScreen> {
               ])
                 Padding(
                   padding: const EdgeInsets.only(right: 8),
-                  child: TextButton(
+                  child: OutlinedButton(
                     onPressed: () => setState(() => subcategory = value),
+                    style: OutlinedButton.styleFrom(
+                      backgroundColor: subcategory == value
+                          ? const Color(0xFF455B77)
+                          : Colors.white,
+                      side: BorderSide(
+                        color: subcategory == value
+                            ? const Color(0xFF455B77)
+                            : const Color(0xFFEAEAEA),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                    ),
                     child: LText(
                       value,
                       style: TextStyle(
-                        fontWeight: subcategory == value
-                            ? FontWeight.bold
-                            : FontWeight.normal,
                         color: subcategory == value
-                            ? brandBlue
-                            : Colors.black54,
+                            ? Colors.white
+                            : Colors.black87,
+                        fontSize: 14,
                       ),
                     ),
                   ),
@@ -271,21 +311,37 @@ class _CatalogScreenState extends State<CatalogScreen> {
           ),
         ),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.fromLTRB(18, 20, 18, 12),
           child: Row(
             children: [
-              LText('${products.length}개 상품'),
+              LText(
+                '${products.length}개 상품',
+                style: const TextStyle(color: Color(0xFF777777), fontSize: 14),
+              ),
               const Spacer(),
-              DropdownButton<String>(
-                value: sort,
-                underline: const SizedBox(),
-                items: ['판매 많은 순', '리뷰 많은 순', '신상품순', '낮은 가격순', '높은 가격순']
-                    .map(
-                      (value) =>
-                          DropdownMenuItem(value: value, child: LText(value)),
-                    )
-                    .toList(),
-                onChanged: (value) => setState(() => sort = value!),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border.all(color: const Color(0xFFEAEAEA)),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: DropdownButton<String>(
+                  value: sort,
+                  underline: const SizedBox(),
+                  items: ['판매 많은 순', '리뷰 많은 순', '신상품순', '낮은 가격순', '높은 가격순']
+                      .map(
+                        (value) => DropdownMenuItem(
+                          value: value,
+                          child: LText(
+                            value,
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) => setState(() => sort = value!),
+                ),
               ),
             ],
           ),
@@ -323,7 +379,7 @@ class ProductGrid extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: constraints.maxWidth > 700 ? 4 : 2,
-        childAspectRatio: showDetails ? .53 : .68,
+        childAspectRatio: showDetails ? .49 : .62,
         crossAxisSpacing: 12,
         mainAxisSpacing: 12,
       ),

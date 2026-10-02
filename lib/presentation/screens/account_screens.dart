@@ -210,7 +210,7 @@ class _AuthScreenState extends State<AuthScreen> {
       ),
       const SizedBox(height: 24),
       const LText(
-        'SOLE / SELECT',
+        'SHUPICK',
         style: TextStyle(
           fontSize: 30,
           fontWeight: FontWeight.w900,
