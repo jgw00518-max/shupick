@@ -10,7 +10,7 @@ class ShupickApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => GetMaterialApp(
-    title: 'SOLE SELECT',
+    title: 'SHUPICK',
     debugShowCheckedModeBanner: false,
     initialBinding: StoreBinding(),
     theme: ThemeData(

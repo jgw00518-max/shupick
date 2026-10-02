@@ -60,10 +60,16 @@ class _ProductCardState extends State<ProductCard> {
       children: [
         Stack(
           children: [
-            ProductImage(widget.product, height: 150),
+            AspectRatio(
+              aspectRatio: 1,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: ProductImage(widget.product, height: double.infinity),
+              ),
+            ),
             Positioned(
-              right: 4,
-              top: 4,
+              right: 6,
+              top: 6,
               child: IconButton(
                 tooltip: '찜',
                 onPressed: () => widget.store.toggleWish(widget.product),
@@ -73,26 +79,29 @@ class _ProductCardState extends State<ProductCard> {
                       : Icons.favorite_border,
                   color: widget.store.wishedIds.contains(widget.product.id)
                       ? brandBlue
-                      : Colors.black87,
+                      : Colors.white,
+                  shadows: const [Shadow(color: Colors.black26, blurRadius: 4)],
                 ),
               ),
             ),
           ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
         LText(
-          '${widget.product.gender} · ${widget.product.category}',
-          style: const TextStyle(color: Colors.grey, fontSize: 11),
+          '${widget.product.gender}  ${widget.product.category}',
+          style: const TextStyle(color: Color(0xFF777777), fontSize: 13),
         ),
+        const SizedBox(height: 3),
         LText(
           widget.product.name,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontWeight: FontWeight.w600),
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
+        const SizedBox(height: 6),
         LText(
           won(widget.product.price),
-          style: const TextStyle(fontWeight: FontWeight.bold),
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
         if (widget.showDetails) ...[
           const SizedBox(height: 5),
@@ -100,7 +109,7 @@ class _ProductCardState extends State<ProductCard> {
             '${widget.product.colors.take(3).join(' · ')} 외',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 11),
+            style: const TextStyle(fontSize: 13),
           ),
           InkWell(
             onTap: () => setState(() => sizesOpen = !sizesOpen),
@@ -112,7 +121,7 @@ class _ProductCardState extends State<ProductCard> {
           if (sizesOpen)
             const LText(
               '230  240  250  260  270  280',
-              style: TextStyle(fontSize: 10),
+              style: TextStyle(fontSize: 12),
             ),
         ],
       ],
@@ -131,11 +140,17 @@ class SectionTitle extends StatelessWidget {
       Expanded(
         child: LText(
           title,
-          style: const TextStyle(fontSize: 21, fontWeight: FontWeight.bold),
+          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
         ),
       ),
       if (action != null)
-        TextButton(onPressed: onAction, child: LText(action!)),
+        TextButton(
+          onPressed: onAction,
+          child: LText(
+            action!,
+            style: const TextStyle(color: Color(0xFF555555), fontSize: 14),
+          ),
+        ),
     ],
   );
 }

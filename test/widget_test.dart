@@ -11,7 +11,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(const ShupickApp());
     await tester.pumpAndSettle();
-    expect(find.text('SOLE / SELECT'), findsOneWidget);
+    expect(find.text('SHUPICK'), findsOneWidget);
     expect(find.text('기획전'), findsOneWidget);
     await tester.tap(find.byIcon(Icons.person_outline));
     await tester.pumpAndSettle();

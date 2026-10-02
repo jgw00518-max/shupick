@@ -131,7 +131,7 @@ class _StoreShellState extends State<StoreShell> {
   ).showSnackBar(SnackBar(content: LText(text)));
 
   String get title => switch (page) {
-    StorePage.home => 'SOLE / SELECT',
+    StorePage.home => 'SHUPICK',
     StorePage.catalog => '전체 상품',
     StorePage.search => '검색',
     StorePage.campaign => campaign,
@@ -150,6 +150,19 @@ class _StoreShellState extends State<StoreShell> {
     StorePage.settings => '설정',
   };
 
+  bool get largerProductText => {
+    StorePage.home,
+    StorePage.catalog,
+    StorePage.search,
+    StorePage.campaign,
+    StorePage.detail,
+    StorePage.recent,
+    StorePage.wish,
+    StorePage.cart,
+    StorePage.checkout,
+    StorePage.orders,
+  }.contains(page);
+
   @override
   Widget build(BuildContext context) => GetBuilder<StoreNavigationController>(
     builder: (_) => GetBuilder<StoreController>(
@@ -161,6 +174,11 @@ class _StoreShellState extends State<StoreShell> {
             appBar: page == StorePage.auth
                 ? null
                 : AppBar(
+                    backgroundColor: dark ? null : Colors.white,
+                    surfaceTintColor: Colors.transparent,
+                    elevation: 0,
+                    toolbarHeight: 60,
+                    titleSpacing: 0,
                     leading: page == StorePage.home
                         ? Builder(
                             builder: (context) => IconButton(
@@ -175,13 +193,16 @@ class _StoreShellState extends State<StoreShell> {
                             icon: const Icon(Icons.arrow_back),
                             onPressed: back,
                           ),
-                    title: LText(
-                      title,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1,
-                      ),
-                    ),
+                    title: page == StorePage.home
+                        ? const Text(
+                            'SHUPICK',
+                            style: TextStyle(
+                              fontSize: 19,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: -.5,
+                            ),
+                          )
+                        : null,
                     actions: [
                       IconButton(
                         tooltip: '검색',
@@ -209,12 +230,26 @@ class _StoreShellState extends State<StoreShell> {
                     action: '다시 시도',
                     onAction: store.load,
                   )
+                : largerProductText
+                ? MediaQuery(
+                    data: MediaQuery.of(
+                      context,
+                    ).copyWith(textScaler: const TextScaler.linear(1.3)),
+                    child: _body(),
+                  )
                 : _body(),
             bottomNavigationBar: page == StorePage.auth
                 ? null
-                : NavigationBar(
-                    height: 64,
-                    selectedIndex: switch (page) {
+                : BottomNavigationBar(
+                    type: BottomNavigationBarType.fixed,
+                    backgroundColor: dark ? null : Colors.white,
+                    selectedItemColor: brandBlue,
+                    unselectedItemColor: const Color(0xFF888888),
+                    selectedFontSize: 12,
+                    unselectedFontSize: 12,
+                    iconSize: 25,
+                    elevation: 4,
+                    currentIndex: switch (page) {
                       StorePage.recent => 1,
                       StorePage.wish => 2,
                       StorePage.profile ||
@@ -226,7 +261,7 @@ class _StoreShellState extends State<StoreShell> {
                       StorePage.settings => 3,
                       _ => 0,
                     },
-                    onDestinationSelected: (index) => go(
+                    onTap: (index) => go(
                       [
                         StorePage.home,
                         StorePage.recent,
@@ -234,22 +269,22 @@ class _StoreShellState extends State<StoreShell> {
                         StorePage.profile,
                       ][index],
                     ),
-                    destinations: const [
-                      NavigationDestination(
+                    items: const [
+                      BottomNavigationBarItem(
                         icon: Icon(Icons.home_outlined),
                         label: '홈',
                       ),
-                      NavigationDestination(
+                      BottomNavigationBarItem(
                         icon: Icon(Icons.history),
                         label: '최근 본 상품',
                       ),
-                      NavigationDestination(
+                      BottomNavigationBarItem(
                         icon: Icon(Icons.favorite_border),
                         label: '찜목록',
                       ),
-                      NavigationDestination(
+                      BottomNavigationBarItem(
                         icon: Icon(Icons.person_outline),
-                        label: '마이',
+                        label: '마이페이지',
                       ),
                     ],
                   ),
@@ -381,13 +416,15 @@ class _StoreShellState extends State<StoreShell> {
   };
 
   Widget _drawer() => Drawer(
+    width: 320,
+    backgroundColor: dark ? null : Colors.white,
     child: SafeArea(
       child: ListView(
         children: [
           ListTile(
             title: const LText(
               '카테고리',
-              style: TextStyle(fontSize: 23, fontWeight: FontWeight.bold),
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
             ),
             trailing: IconButton(
               icon: const Icon(Icons.close),
@@ -395,23 +432,39 @@ class _StoreShellState extends State<StoreShell> {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
             child: Row(
               children: [
                 for (final gender in ['남성', '여성', '키즈'])
                   Expanded(
-                    child: TextButton(
-                      onPressed: () => setState(() {
-                        drawerGender = gender;
-                        drawerMiddle = null;
-                      }),
-                      child: LText(
-                        gender,
-                        style: TextStyle(
-                          fontWeight: drawerGender == gender
-                              ? FontWeight.bold
-                              : FontWeight.normal,
-                          color: drawerGender == gender ? brandBlue : null,
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 5),
+                      child: OutlinedButton(
+                        onPressed: () => setState(() {
+                          drawerGender = gender;
+                          drawerMiddle = null;
+                        }),
+                        style: OutlinedButton.styleFrom(
+                          backgroundColor: drawerGender == gender
+                              ? const Color(0xFF455B77)
+                              : Colors.white,
+                          side: BorderSide(
+                            color: drawerGender == gender
+                                ? const Color(0xFF455B77)
+                                : const Color(0xFFEAEAEA),
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: LText(
+                          gender,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: drawerGender == gender
+                                ? Colors.white
+                                : Colors.black87,
+                          ),
                         ),
                       ),
                     ),
@@ -419,9 +472,16 @@ class _StoreShellState extends State<StoreShell> {
               ],
             ),
           ),
-          const ListTile(title: LText('신발 종류')),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(20, 6, 20, 12),
+            child: LText(
+              '신발 종류',
+              style: TextStyle(color: Color(0xFF999999), fontSize: 12),
+            ),
+          ),
           for (final entry in MockProductRepository.categoryTree.entries) ...[
             ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 20),
               title: LText(entry.key),
               trailing: Icon(
                 drawerMiddle == entry.key ? Icons.remove : Icons.add,
@@ -431,6 +491,7 @@ class _StoreShellState extends State<StoreShell> {
                     drawerMiddle = drawerMiddle == entry.key ? null : entry.key,
               ),
             ),
+            const Divider(height: 1, indent: 20, endIndent: 20),
             if (drawerMiddle == entry.key)
               for (final sub in ['전체', ...entry.value])
                 ListTile(

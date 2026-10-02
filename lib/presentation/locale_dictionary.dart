@@ -92,8 +92,8 @@ const englishDictionary = <String, String>{
   "다시 만나 반가워요": "Welcome back",
   "새 계정 만들기": "Create an account",
   "비밀번호 찾기": "Reset password",
-  "SOLE/SELECT에 로그인하고 쇼핑을 이어가세요.":
-      "Log in to continue shopping with SOLE/SELECT.",
+  "SHUPICK에 로그인하고 쇼핑을 이어가세요.":
+      "Log in to continue shopping with SHUPICK.",
   "이메일로 간단하게 가입할 수 있어요.": "Create your account using your email.",
   "가입한 이메일로 재설정 안내를 보내드려요.": "Enter your email for reset instructions.",
   "이메일": "Email",
@@ -247,7 +247,7 @@ const englishDictionary = <String, String>{
   "반품 완료": "Returned",
   "화이트 · 250 · 1개": "White · 250 · 1 item",
   "9월 11일 환불이 완료되었습니다.": "Refund completed on September 11.",
-  "SOLE/SELECT를 내 방식으로 사용하세요.": "Make SOLE/SELECT your own.",
+  "SHUPICK을 내 방식으로 사용하세요.": "Make SHUPICK your own.",
   "화면": "Appearance",
   "다크 테마": "Dark mode",
   "어두운 화면으로 전환": "Use a darker color theme",
@@ -262,7 +262,7 @@ const englishDictionary = <String, String>{
   "본사 출고 준비": "Preparing at warehouse",
   "상품 검수와 포장이 완료되었습니다.": "Quality check and packaging complete.",
   "본사 출고": "Dispatched from warehouse",
-  "SOLE 본사 물류센터에서 출발했습니다.": "Your order has left the SOLE warehouse.",
+  "SHUPICK 본사 물류센터에서 출발했습니다.": "Your order has left the SHUPICK warehouse.",
   "대리점 이동 중": "On the way to store",
   "성동 대리점으로 이동하고 있습니다.": "On the way to the Seongdong store.",
   "대리점 도착": "Arrived at store",
@@ -280,7 +280,7 @@ const englishDictionary = <String, String>{
   "리뷰를 작성하고 적립금을 받아보세요.": "Write a review and earn points.",
   "영업시간 안에 방문하여 QR 코드를 보여주세요.":
       "Visit during opening hours with your order details.",
-  "SOLE 성동점": "SOLE Seongdong",
+  "SHUPICK 성동점": "SHUPICK Seongdong",
   "서울 성동구 왕십리로 83, 1층": "1F, 83 Wangsimni-ro, Seongdong-gu, Seoul",
   "오늘 10:30 - 20:00": "Today 10:30–20:00",
   "대리점 전화": "Call store",
@@ -308,7 +308,7 @@ const englishDictionary = <String, String>{
   "· 10월 31일까지": " · Valid through October 31",
   "받음": "Claimed",
   "받기": "Claim",
-  "쇼핑할수록 쌓이는 SOLE 포인트": "Earn SOLE points as you shop",
+  "쇼핑할수록 쌓이는 SHUPICK 포인트": "Earn SHUPICK points as you shop",
   "사용 가능 적립금": "Available points",
   "30일 이내 소멸 예정 1,200P": "1,200P expires within 30 days",
   "적립 내역": "Points history",
@@ -325,8 +325,8 @@ const englishDictionary = <String, String>{
   "픽업 대리점 운영시간이 궁금해요": "What are the pickup store hours?",
   "퇴근 후 방문하려고 합니다. 평일 운영시간을 알려주세요.":
       "I plan to visit after work. What are the weekday hours?",
-  "SOLE 성동점은 평일 오전 10시 30분부터 오후 8시까지 운영합니다. 방문 시 주문 QR을 준비해주세요.":
-      "SOLE Seongdong is open weekdays from 10:30 am to 8 pm. Please bring your order details.",
+  "SHUPICK 성동점은 평일 오전 10시 30분부터 오후 8시까지 운영합니다. 방문 시 주문 QR을 준비해주세요.":
+      "SHUPICK Seongdong is open weekdays from 10:30 am to 8 pm. Please bring your order details.",
   "Silver Current 재입고 문의": "Silver Current restock inquiry",
   "260 사이즈 재입고 예정일이 궁금합니다.": "When will size 260 be back in stock?",
   "문의 제목을 입력해주세요.": "Enter an inquiry title.",
