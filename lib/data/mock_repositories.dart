@@ -275,7 +275,7 @@ class MockShoppingRepository implements ShoppingRepository {
     recentIds: [],
   );
   @override
-  Future<ShoppingSnapshot> load() async => _snapshot;
+  Future<ShoppingSnapshot> load(List<Product> products) async => _snapshot;
   @override
   Future<void> save(ShoppingSnapshot snapshot) async => _snapshot = snapshot;
 }
