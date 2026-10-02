@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../localization.dart';
 
 import '../../app/store_controller.dart';
+import '../../data/api_order_repository.dart';
 import '../../domain/models.dart';
 import '../shared/store_widgets.dart';
 import 'review_sheet.dart';
@@ -369,11 +370,66 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   String district = '성동구';
   String payment = '카드';
   String coupon = '';
+  List<CheckoutCoupon> coupons = [];
+  int pointBalance = 0;
+  bool benefitsLoading = true;
+  String? benefitsError;
   int points = 0;
   bool agreed = false;
   bool submitting = false;
+  bool branchesLoading = true;
+  String? branchError;
+  List<PickupBranch> branches = [];
   StoreOrder? created;
   final pointsController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBranches();
+    _loadBenefits();
+  }
+
+  Future<void> _loadBenefits() async {
+    setState(() {
+      benefitsLoading = true;
+      benefitsError = null;
+    });
+    try {
+      final loadedCoupons = await widget.store.getCoupons();
+      final balance = await widget.store.getPointBalance();
+      if (mounted) {
+        setState(() {
+          coupons = loadedCoupons;
+          pointBalance = balance;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => benefitsError = '쿠폰·포인트 조회에 실패했습니다.');
+    } finally {
+      if (mounted) setState(() => benefitsLoading = false);
+    }
+  }
+
+  Future<void> _loadBranches() async {
+    try {
+      final loaded = await widget.store.getPickupBranches();
+      if (!mounted) return;
+      setState(() {
+        branches = loaded;
+        branchError = loaded.isEmpty ? '현재 선택 가능한 픽업 대리점이 없습니다.' : null;
+        if (loaded.isNotEmpty &&
+            !loaded.any((branch) => branch.districtName == district)) {
+          district = loaded.first.districtName;
+        }
+      });
+    } catch (_) {
+      if (mounted) setState(() => branchError = '픽업 대리점을 불러오지 못했습니다.');
+    } finally {
+      if (mounted) setState(() => branchesLoading = false);
+    }
+  }
+
   @override
   void dispose() {
     pointsController.dispose();
@@ -383,15 +439,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   int get subtotal => widget.lines.fold(0, (sum, item) => sum + item.total);
   bool get sneakers =>
       widget.lines.any((item) => item.product.category == '운동화');
-  int get discount => coupon == 'welcome' && subtotal >= 30000
-      ? 5000
-      : coupon == 'sneakers' && subtotal >= 100000 && sneakers
-      ? (subtotal * .1).round()
-      : 0;
-  int get validPoints => points.clamp(
-    0,
-    [32500, subtotal - discount].reduce((a, b) => a < b ? a : b),
-  );
+  int get discount =>
+      coupons
+          .where((item) => item.id.toString() == coupon)
+          .firstOrNull
+          ?.discount(subtotal) ??
+      0;
+  int get validPoints =>
+      points.clamp(0, pointBalance.clamp(0, subtotal - discount));
   int get total => (subtotal - discount - validPoints).clamp(0, subtotal);
 
   Future<void> _pay() async {
@@ -409,6 +464,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         paidTotal: total,
         couponDiscount: discount,
         pointsUsed: validPoints,
+        paymentMethod: payment,
+        customerCouponId: int.tryParse(coupon),
         fromCart: widget.fromCart,
       );
       if (mounted) {
@@ -417,11 +474,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           step = 3;
         });
       }
-    } catch (_) {
+    } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: LText('목업 주문을 완료하지 못했습니다.')));
+        ).showSnackBar(SnackBar(content: LText('주문을 완료하지 못했습니다: $error')));
       }
     } finally {
       if (mounted) setState(() => submitting = false);
@@ -464,31 +521,67 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               labelText: '서울시 자치구',
               border: OutlineInputBorder(),
             ),
-            items: pickupDistricts
-                .map(
-                  (value) =>
-                      DropdownMenuItem(value: value, child: LText(value)),
-                )
-                .toList(),
-            onChanged: (value) => setState(() => district = value!),
+            items:
+                (branches.isEmpty
+                        ? [district]
+                        : branches.map((item) => item.districtName).toSet())
+                    .map(
+                      (value) =>
+                          DropdownMenuItem(value: value, child: LText(value)),
+                    )
+                    .toList(),
+            onChanged: branchesLoading || branchError != null
+                ? null
+                : (value) => setState(() => district = value!),
           ),
+          if (branchesLoading) const LinearProgressIndicator(),
+          if (branchError != null)
+            Row(
+              children: [
+                Expanded(child: LText(branchError!)),
+                TextButton(
+                  onPressed: _loadBranches,
+                  child: const LText('다시 시도'),
+                ),
+              ],
+            ),
           const SizedBox(height: 12),
-          PickupStoreInfo(district: district),
+          PickupStoreInfo(
+            district: district,
+            branch: branches
+                .where((branch) => branch.districtName == district)
+                .firstOrNull,
+          ),
           const SizedBox(height: 18),
           FilledButton(
-            onPressed: () => setState(() => step = 2),
+            onPressed:
+                branchesLoading || branchError != null || branches.isEmpty
+                ? null
+                : () => setState(() => step = 2),
             child: const LText('결제 수단 선택'),
           ),
         ] else ...[
           ListTile(
-            title: LText('SHUPICK $district점'),
+            title: LText(
+              branches
+                      .where((branch) => branch.districtName == district)
+                      .firstOrNull
+                      ?.name ??
+                  '대리점 정보 미등록',
+            ),
             subtitle: const LText('픽업 대리점'),
             trailing: TextButton(
               onPressed: () => setState(() => step = 1),
               child: const LText('수정'),
             ),
           ),
-          PickupStoreInfo(district: district, compact: true),
+          PickupStoreInfo(
+            district: district,
+            compact: true,
+            branch: branches
+                .where((branch) => branch.districtName == district)
+                .firstOrNull,
+          ),
           const SizedBox(height: 16),
           const SectionTitle('결제 수단'),
           for (final method in ['카드', '카카오페이', '네이버페이'])
@@ -503,33 +596,36 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ),
           const SizedBox(height: 10),
           const LText('쿠폰 선택'),
+          if (benefitsLoading) const LinearProgressIndicator(),
+          if (benefitsError != null)
+            TextButton(
+              onPressed: _loadBenefits,
+              child: LText('$benefitsError 다시 시도'),
+            ),
           DropdownButtonFormField<String>(
             initialValue: coupon,
             items: [
-              const DropdownMenuItem(value: '', child: LText('쿠폰을 선택하세요')),
-              DropdownMenuItem(
-                value: 'welcome',
-                enabled: subtotal >= 30000,
-                child: const LText('앱 첫 구매 5,000원 할인 (3만원 이상)'),
-              ),
-              DropdownMenuItem(
-                value: 'sneakers',
-                enabled: subtotal >= 100000 && sneakers,
-                child: const LText('운동화 10% 할인 (10만원 이상)'),
-              ),
+              const DropdownMenuItem(value: '', child: LText('사용 안 함')),
+              for (final item in coupons.where(
+                (item) => subtotal >= item.minimum,
+              ))
+                DropdownMenuItem(
+                  value: item.id.toString(),
+                  child: LText(item.name),
+                ),
             ],
-            onChanged: (value) => setState(() {
-              coupon = value!;
-              points = validPoints;
-            }),
+            onChanged: benefitsLoading || benefitsError != null
+                ? null
+                : (value) => setState(() => coupon = value ?? ''),
           ),
           const SizedBox(height: 12),
-          const LText('적립금 사용 · 보유 32,500P'),
+          LText('적립금 사용 · 보유 ${won(pointBalance)}'),
           Row(
             children: [
               Expanded(
                 child: TextField(
                   controller: pointsController,
+                  enabled: !benefitsLoading && benefitsError == null,
                   keyboardType: TextInputType.number,
                   decoration: const InputDecoration(hintText: '0'),
                   onChanged: (value) => setState(
@@ -539,13 +635,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 ),
               ),
               TextButton(
-                onPressed: () => setState(() {
-                  points = [
-                    32500,
-                    subtotal - discount,
-                  ].reduce((a, b) => a < b ? a : b);
-                  pointsController.text = '$points';
-                }),
+                onPressed: benefitsLoading || benefitsError != null
+                    ? null
+                    : () => setState(() {
+                        points = pointBalance.clamp(0, subtotal - discount);
+                        pointsController.text = points.toString();
+                      }),
                 child: const LText('전액 사용'),
               ),
             ],
@@ -613,20 +708,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   );
 }
 
-/// 자치구에 따른 목업 대리점 운영 정보를 제공합니다.
+/// 선택한 실제 대리점의 운영 정보만 표시하고 미등록 값은 추측하지 않습니다.
 class PickupStoreInfo extends StatelessWidget {
   const PickupStoreInfo({
     super.key,
     required this.district,
+    this.branch,
     this.compact = false,
   });
   final String district;
+  final PickupBranch? branch;
   final bool compact;
   @override
   Widget build(BuildContext context) {
-    final index = pickupDistricts
-        .indexOf(district)
-        .clamp(0, pickupDistricts.length - 1);
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -635,17 +729,26 @@ class PickupStoreInfo extends StatelessWidget {
           children: [
             if (!compact)
               LText(
-                'SHUPICK $district점',
+                branch?.name ?? '대리점 정보를 불러오는 중입니다.',
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
             LText(
-              '픽업 가능 시간 · 평일 ${index.isEven ? '10:00–20:00' : '10:30–20:00'}',
+              '주소 · ${branch?.address.isNotEmpty == true ? branch!.address : '미등록'}',
             ),
             LText(
-              '토·일요일 ${index % 3 == 0 ? '11:00–18:00' : '11:00–19:00'} · 공휴일 휴무',
+              '대리점 연락처 · ${branch?.phone.isNotEmpty == true ? branch!.phone : '미등록'}',
             ),
-            LText('대리점 연락처 · 02-0000-${1001 + index}'),
-            const LText('운영시간과 연락처는 목업용 예시입니다.'),
+            if (branch?.businessHours.isNotEmpty != true)
+              const LText('운영시간 · 미등록'),
+            for (final hour
+                in branch?.businessHours ?? <Map<String, dynamic>>[])
+              LText(
+                '${const ['월', '화', '수', '목', '금', '토', '일'][(hour['dayOfWeek'] as int) - 1]}요일 · ${hour['isClosed'] == true
+                    ? '휴무'
+                    : hour['opensAt'] == null || hour['closesAt'] == null
+                    ? '운영시간 미등록'
+                    : '${hour['opensAt']}–${hour['closesAt']}'}',
+              ),
           ],
         ),
       ),
@@ -664,6 +767,136 @@ class OrdersScreen extends StatelessWidget {
   final StoreController store;
   final void Function(String) onMessage;
   final void Function(StoreOrder) onShipping;
+
+  Future<void> _returnHistory(BuildContext context) async {
+    final repository = store.orderRepository;
+    if (repository is! ApiOrderRepository) return;
+    try {
+      final entries = await repository.getReturns();
+      for (final entry in entries) {
+        if (entry['status'] != 'REJECTED' && entry['status'] != 'CANCELED') {
+          entry['quote'] = await repository.getReturnQuote(
+            (entry['id'] as num).toInt(),
+          );
+        }
+      }
+      if (!context.mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const LText('반품·환불 내역'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (entries.isEmpty) const LText('반품 신청 내역이 없습니다.'),
+                for (final entry in entries)
+                  ListTile(
+                    title: LText(
+                      '주문 ${entry['orderId']} · ${switch (entry['status']) {
+                        'REQUESTED' => '검수 대기',
+                        'APPROVED' => '승인',
+                        'REJECTED' => '반려',
+                        'COMPLETED' => '반품 처리 완료',
+                        'REFUNDED' => '환불 완료',
+                        _ => entry['status'],
+                      }}',
+                    ),
+                    subtitle: LText(
+                      '${entry['reason']}${entry['quote'] == null ? '' : '\n예상 환불액 ${won((entry['quote']['refundAmount'] as num).toInt())} · 배분 포인트 ${entry['quote']['allocatedPoints']}P\n만료된 포인트는 복원되지 않습니다.'}',
+                    ),
+                    trailing: LText(
+                      won((entry['refundAmount'] as num).toInt()),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const LText('닫기'),
+            ),
+          ],
+        ),
+      );
+    } catch (error) {
+      onMessage('반품 내역 조회 실패: $error');
+    }
+  }
+
+  Future<void> _return(BuildContext context, StoreOrder order) async {
+    final quantities = <String, int>{};
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const LText('상품 선택 반품 신청'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const LText(
+                  '수령 후 7일 이내, 미착용·훼손 없음·구성품과 포장 유지 조건의 단순변심 반품입니다. 검수 후 환불됩니다.',
+                ),
+                for (final item in order.items)
+                  ListTile(
+                    title: Text(item.product.name),
+                    subtitle: Text('${item.color} / ${item.size}'),
+                    trailing: DropdownButton<int>(
+                      value: quantities[item.key] ?? 0,
+                      items: List.generate(
+                        item.quantity + 1,
+                        (quantity) => DropdownMenuItem(
+                          value: quantity,
+                          child: Text(quantity == 0 ? '선택 안 함' : '$quantity개'),
+                        ),
+                      ),
+                      onChanged: (quantity) => setDialogState(() {
+                        if (quantity == null || quantity == 0) {
+                          quantities.remove(item.key);
+                        } else {
+                          quantities[item.key] = quantity;
+                        }
+                      }),
+                    ),
+                  ),
+                const LText('한 주문당 반품 신청은 한 번만 가능합니다. 신청할 상품을 모두 선택해주세요.'),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const LText('닫기'),
+            ),
+            FilledButton(
+              onPressed: quantities.isEmpty
+                  ? null
+                  : () => Navigator.pop(context, true),
+              child: const LText('신청'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (confirmed != true) return;
+    final repository = store.orderRepository;
+    if (repository is! ApiOrderRepository) {
+      onMessage('서버 연결이 필요합니다.');
+      return;
+    }
+    try {
+      await repository.requestReturn(
+        order,
+        '고객 단순변심 선택 반품',
+        quantities: quantities,
+      );
+      onMessage('반품 신청이 접수되었습니다. 대리점 검수를 기다려주세요.');
+    } catch (error) {
+      onMessage('반품 신청 실패: $error');
+    }
+  }
 
   void _detail(BuildContext context, StoreOrder order) => showDialog<void>(
     context: context,
@@ -706,28 +939,12 @@ class OrdersScreen extends StatelessWidget {
   void _qr(BuildContext context, StoreOrder order) => showDialog<void>(
     context: context,
     builder: (context) => AlertDialog(
-      title: const LText('주문 QR 코드'),
+      title: const LText('픽업 결제 코드'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           const LText('매장 픽업용'),
           LText(order.number),
-          SizedBox(
-            width: 180,
-            height: 180,
-            child: GridView.count(
-              crossAxisCount: 9,
-              physics: const NeverScrollableScrollPhysics(),
-              children: [
-                for (var i = 0; i < 81; i++)
-                  ColoredBox(
-                    color: i.isEven || i % 5 == 0 || i % 11 == 0
-                        ? Colors.black
-                        : Colors.white,
-                  ),
-              ],
-            ),
-          ),
           LText('SHUPICK ${order.district}점 직원에게 보여주세요.'),
         ],
       ),
@@ -745,6 +962,21 @@ class OrdersScreen extends StatelessWidget {
     padding: const EdgeInsets.all(16),
     children: [
       const SectionTitle('주문 내역'),
+      TextButton(
+        onPressed: () => _returnHistory(context),
+        child: const LText('반품·환불 내역'),
+      ),
+      TextButton.icon(
+        onPressed: store.ordersLoading ? null : store.refreshOrders,
+        icon: const Icon(Icons.refresh),
+        label: const LText('새로고침'),
+      ),
+      if (store.ordersLoading) const LinearProgressIndicator(),
+      if (store.ordersError != null) LText(store.ordersError!),
+      if (!store.ordersLoading &&
+          store.ordersError == null &&
+          store.orders.isEmpty)
+        const LText('주문 내역이 없습니다. 로그인 후 주문을 확인해주세요.'),
       const LText('주문과 배송 상태를 확인하세요.'),
       const SizedBox(height: 16),
       for (final order in store.orders)
@@ -756,10 +988,17 @@ class OrdersScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  LText(
-                    order.canceled ? '취소 완료' : '배송 중',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
+                  LText(switch (order.status) {
+                    'PENDING_PAYMENT' => '결제 대기',
+                    'PAID' => '결제 완료',
+                    'PREPARING' => '상품 준비',
+                    'SHIPPING' => '배송 중',
+                    'READY_FOR_PICKUP' => '픽업 가능',
+                    'COMPLETED' => '수령 완료',
+                    'CANCELED' => '취소 완료',
+                    'REFUNDED' => '환불 완료',
+                    _ => order.status,
+                  }, style: const TextStyle(fontWeight: FontWeight.bold)),
                   LText(
                     '${order.date.year}.${order.date.month.toString().padLeft(2, '0')}.${order.date.day.toString().padLeft(2, '0')} · ${order.number}',
                   ),
@@ -778,11 +1017,57 @@ class OrdersScreen extends StatelessWidget {
                       trailing: LText(won(item.total)),
                     ),
                   if (!order.canceled) ...[
+                    if (order.status == 'COMPLETED')
+                      TextButton(
+                        onPressed: order.purchaseConfirmed
+                            ? null
+                            : () async {
+                                final confirmed = await showDialog<bool>(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    title: const LText('구매확정'),
+                                    content: const LText(
+                                      '구매확정 후에는 반품·환불이 불가능합니다. 구매확정하면 리뷰를 작성할 수 있으며 최초 작성 시 1,000P가 적립됩니다. 구매확정 금액은 다음 회원등급 산정에 반영됩니다. 확정할까요?',
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.pop(context, false),
+                                        child: const LText('닫기'),
+                                      ),
+                                      FilledButton(
+                                        onPressed: () =>
+                                            Navigator.pop(context, true),
+                                        child: const LText('확정'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                if (confirmed != true) return;
+                                try {
+                                  await store.confirmPurchase(order);
+                                  onMessage('구매확정이 완료되었습니다.');
+                                } catch (error) {
+                                  onMessage('구매확정 실패: $error');
+                                }
+                              },
+                        child: LText(
+                          order.purchaseConfirmed ? '구매확정 완료' : '구매확정',
+                        ),
+                      ),
+                    if (order.status == 'COMPLETED' && !order.purchaseConfirmed)
+                      TextButton(
+                        onPressed: () => _return(context, order),
+                        child: const LText('상품 선택 반품 신청'),
+                      ),
                     for (final item in order.items)
                       Align(
                         alignment: Alignment.centerRight,
                         child: TextButton(
-                          onPressed: store.hasReview(order, item)
+                          onPressed:
+                              !order.purchaseConfirmed ||
+                                  order.status != 'COMPLETED' ||
+                                  store.hasReview(order, item)
                               ? null
                               : () {
                                   showModalBottomSheet<void>(
@@ -798,7 +1083,11 @@ class OrdersScreen extends StatelessWidget {
                                   );
                                 },
                           child: LText(
-                            store.hasReview(order, item) ? '작성 완료' : '리뷰 작성',
+                            store.hasReview(order, item)
+                                ? '작성 완료'
+                                : !order.purchaseConfirmed
+                                ? '구매확정 후 작성'
+                                : '리뷰 작성 (1,000P)',
                           ),
                         ),
                       ),
@@ -811,11 +1100,11 @@ class OrdersScreen extends StatelessWidget {
                         ),
                         TextButton(
                           onPressed: () => _qr(context, order),
-                          child: const LText('QR 확인'),
+                          child: const LText('결제 코드 확인'),
                         ),
                       ],
                     ),
-                    const LText('대리점 픽업 시 주문 QR 코드를 보여주세요.'),
+                    const LText('대리점 픽업 시 결제 코드를 보여주세요.'),
                   ] else
                     const LText('주문이 취소되었습니다. 결제 수단에 따라 영업일 기준 2~5일 이내 환불됩니다.'),
                 ],
@@ -823,15 +1112,6 @@ class OrdersScreen extends StatelessWidget {
             ),
           ),
         ),
-      Card(
-        child: ListTile(
-          title: const LText('반품 완료 · SS0903-0711'),
-          subtitle: const LText(
-            'Coast Sandal · 화이트 · 250 · 1개\n9월 11일 환불이 완료되었습니다.',
-          ),
-          trailing: LText(won(79000)),
-        ),
-      ),
     ],
   );
 }

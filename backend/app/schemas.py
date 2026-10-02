@@ -36,12 +36,25 @@ class ProductOptionResponse(BaseModel):
     inventoryStatus: str
 
 
+class PickupBranchResponse(BaseModel):
+    """Active branch available for customer pickup."""
+
+    branchId: int
+    branchCode: str
+    branchName: str
+    districtCode: str
+    districtName: str
+    address: str
+    phone: str
+    businessHours: list[dict] = Field(default_factory=list)
+
+
 class RefundItemRequest(BaseModel):
     """One order line and quantity included in a return refund."""
 
     orderItemId: int = Field(gt=0)
     quantity: int = Field(gt=0)
-    refundAmount: int = Field(gt=0)
+    refundAmount: int = Field(ge=0)
 
 
 class RefundCreateRequest(BaseModel):
@@ -50,7 +63,7 @@ class RefundCreateRequest(BaseModel):
     paymentId: int = Field(gt=0)
     returnRequestId: int | None = Field(default=None, gt=0)
     refundType: Literal["ORDER_CANCEL", "RETURN", "MANUAL_ADJUSTMENT"]
-    refundAmount: int = Field(gt=0)
+    refundAmount: int = Field(ge=0)
     idempotencyKey: str = Field(min_length=1, max_length=100)
     items: list[RefundItemRequest] = Field(default_factory=list)
 
@@ -95,6 +108,8 @@ class PaymentCompleteRequest(BaseModel):
 
     paymentMethod: str = Field(min_length=1, max_length=30)
     transactionKey: str = Field(min_length=1, max_length=100)
+    customerCouponId: int | None = Field(default=None, gt=0)
+    pointsUsed: int = Field(default=0, ge=0)
 
 
 class PaymentFailRequest(BaseModel):
@@ -120,6 +135,9 @@ class OrderTransactionResponse(BaseModel):
     reservedQuantity: int
     paymentId: int | None = None
     fulfillmentId: int | None = None
+    paidTotal: int | None = None
+    couponDiscount: int = 0
+    pointsUsed: int = 0
 
 
 class StatusHistoryResponse(BaseModel):

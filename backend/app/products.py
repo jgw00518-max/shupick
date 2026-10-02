@@ -17,8 +17,8 @@ PRODUCT_LIST_SQL = """
 SELECT
   p.product_id,
   p.product_name,
-  COALESCE(parent.category_name, c.category_name) AS category_name,
-  c.category_name AS middle_category,
+  CASE WHEN parent.parent_category_id IS NOT NULL THEN parent.category_name ELSE c.category_name END AS category_name,
+  CASE WHEN parent.parent_category_id IS NOT NULL THEN parent.category_name ELSE c.category_name END AS middle_category,
   c.category_name AS subcategory,
   p.price,
   CASE p.gender_code

@@ -92,8 +92,7 @@ const englishDictionary = <String, String>{
   "다시 만나 반가워요": "Welcome back",
   "새 계정 만들기": "Create an account",
   "비밀번호 찾기": "Reset password",
-  "SHUPICK에 로그인하고 쇼핑을 이어가세요.":
-      "Log in to continue shopping with SHUPICK.",
+  "SHUPICK에 로그인하고 쇼핑을 이어가세요.": "Log in to continue shopping with SHUPICK.",
   "이메일로 간단하게 가입할 수 있어요.": "Create your account using your email.",
   "가입한 이메일로 재설정 안내를 보내드려요.": "Enter your email for reset instructions.",
   "이메일": "Email",

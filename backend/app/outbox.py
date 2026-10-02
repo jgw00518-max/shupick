@@ -82,6 +82,19 @@ class FirestoreOutboxPublisher:
             "lastOutboxEventId": int(event["outbox_event_id"]),
             "syncedAt": firestore.SERVER_TIMESTAMP,
         }
+        # 소유권은 이벤트 입력값 대신 MySQL에서 조회하여 읽기 규칙에 사용합니다.
+        if event['aggregate_type'] != 'INVENTORY':
+            with mysql_connection() as connection:
+                with connection.cursor() as cursor:
+                    joins = {'ORDER': 'orders o',
+                        'FULFILLMENT': 'fulfillments entity JOIN orders o ON o.order_id=entity.order_id',
+                        'PICKUP': 'pickups entity JOIN orders o ON o.order_id=entity.order_id'}
+                    keys = {'ORDER':'o.order_id','FULFILLMENT':'entity.fulfillment_id','PICKUP':'entity.pickup_id'}
+                    cursor.execute(f"SELECT o.order_id,c.firebase_uid FROM {joins[event['aggregate_type']]} JOIN customers c ON c.customer_id=o.customer_id WHERE {keys[event['aggregate_type']]}=%s", (event['aggregate_id'],))
+                    owner = cursor.fetchone()
+                    if owner is None: raise ValueError('Projection owner not found')
+                    document['customerUid'] = owner['firebase_uid']
+                    document['orderId'] = owner['order_id']
 
         @firestore.transactional
         def write_if_newer(current_transaction: Any) -> None:

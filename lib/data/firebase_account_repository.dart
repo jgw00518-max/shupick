@@ -1,13 +1,42 @@
+import 'dart:convert';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:http/http.dart' as http;
 
 import '../domain/repositories.dart';
+import 'api_product_repository.dart';
 
 class FirebaseAccountRepository implements AccountRepository {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
 
   bool _googleInitialized = false;
+
+  /// Firebase 계정을 MySQL 고객 프로필과 연결해 이후 주문 인증에 사용합니다.
+  Future<void> _syncCustomerProfile() async {
+    final user = _auth.currentUser;
+    final token = await user?.getIdToken();
+    final email = user?.email;
+    if (user == null || token == null || email == null) {
+      throw StateError('회원 인증 정보를 확인하지 못했습니다.');
+    }
+    final response = await http.post(
+      Uri.parse('$defaultApiBaseUrl/auth/customer/sync'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json; charset=utf-8',
+      },
+      body: jsonEncode({
+        'customerName': user.displayName?.trim().isNotEmpty == true
+            ? user.displayName!.trim()
+            : email.split('@').first,
+      }),
+    );
+    if (response.statusCode != 200) {
+      throw StateError('MySQL 회원 정보 연결에 실패했습니다. (${response.statusCode})');
+    }
+  }
 
   Future<void> _initializeGoogle() async {
     if (_googleInitialized) return;
@@ -20,10 +49,15 @@ class FirebaseAccountRepository implements AccountRepository {
   Future<bool> signIn(String email, String password) async {
     try {
       await _auth.signInWithEmailAndPassword(email: email, password: password);
+      await _syncCustomerProfile();
 
       return true;
     } on FirebaseAuthException {
       return false;
+    } on StateError {
+      rethrow;
+    } catch (_) {
+      throw StateError('MySQL 회원 정보 연결에 실패했습니다.');
     }
   }
 
@@ -34,6 +68,7 @@ class FirebaseAccountRepository implements AccountRepository {
         email: email,
         password: password,
       );
+      await _syncCustomerProfile();
     } on FirebaseAuthException catch (e) {
       if (e.code == 'email-already-in-use') {
         throw StateError('이미 가입한 이메일입니다.');
@@ -69,12 +104,17 @@ class FirebaseAccountRepository implements AccountRepository {
       );
 
       await _auth.signInWithCredential(credential);
+      await _syncCustomerProfile();
 
       return true;
     } on GoogleSignInException {
       return false;
     } on FirebaseAuthException {
       return false;
+    } on StateError {
+      rethrow;
+    } catch (_) {
+      throw StateError('MySQL 회원 정보 연결에 실패했습니다.');
     }
   }
 

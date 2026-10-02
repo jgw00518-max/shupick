@@ -5,11 +5,12 @@ from datetime import datetime
 from typing import Any
 from uuid import uuid4
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pymysql import MySQLError
 from pymysql.connections import Connection
 
 from .database import mysql_connection
+from .auth import CurrentEmployee, require_permission
 from .schemas import (
     RefundCompleteRequest,
     RefundCreateRequest,
@@ -17,9 +18,44 @@ from .schemas import (
     RefundResponse,
 )
 from .status_history import record_order_status
+from .refund_allocation import line_allocations, quantity_share
 
 
 router = APIRouter(prefix="/refunds", tags=["refunds"])
+
+
+def _restore_used_points(connection: Connection, order_id: int, refund_id: int, before: int, target: int) -> None:
+    """Restore full-refund spending to original unexpired lots exactly once."""
+    key = f'refund-points-{refund_id}'
+    with connection.cursor() as cursor:
+        cursor.execute('SELECT customer_id FROM orders WHERE order_id=%s', (order_id,))
+        customer_id = cursor.fetchone()['customer_id']
+        cursor.execute('SELECT point_balance FROM point_wallets WHERE customer_id=%s FOR UPDATE', (customer_id,))
+        wallet = cursor.fetchone()
+        cursor.execute('SELECT point_transaction_id FROM point_transactions WHERE idempotency_key=%s', (key,))
+        if cursor.fetchone() is not None: return
+        cursor.execute("""SELECT pl.point_lot_id,pl.expires_at>NOW() AS unexpired,SUM(pud.used_amount) AS amount
+            FROM point_transactions pt JOIN point_usage_details pud
+            ON pud.usage_transaction_id=pt.point_transaction_id
+            JOIN point_lots pl ON pl.point_lot_id=pud.point_lot_id
+            WHERE pt.order_id=%s AND pt.transaction_type='USE'
+            GROUP BY pl.point_lot_id,pl.expires_at ORDER BY pl.expires_at,pl.point_lot_id FOR UPDATE""", (order_id,))
+        lots = cursor.fetchall()
+        offset = 0
+        restored = []
+        for lot in lots:
+            used = int(lot['amount'])
+            share = max(0, min(target, offset+used)-max(before, offset))
+            if share and lot['unexpired']:
+                restored.append((lot['point_lot_id'], share))
+            offset += used
+        amount = sum(share for _, share in restored)
+        if not amount: return
+        balance = int(wallet['point_balance'])+amount
+        cursor.execute("INSERT INTO point_transactions (customer_id,transaction_type,point_amount,balance_after,order_id,idempotency_key,description) VALUES (%s,'REFUND',%s,%s,%s,%s,'전액 환불 사용 포인트 복원')", (customer_id,amount,balance,order_id,key))
+        for lot_id, share in restored:
+            cursor.execute("UPDATE point_lots SET remaining_amount=remaining_amount+%s,lot_status='AVAILABLE' WHERE point_lot_id=%s", (share,lot_id))
+        cursor.execute('UPDATE point_wallets SET point_balance=%s WHERE customer_id=%s', (balance,customer_id))
 
 
 def validate_refund_items(
@@ -110,12 +146,34 @@ def _validate_return_items(
             raise HTTPException(status_code=409, detail="Refund item amount exceeds its order line amount")
 
 
+def _allocation(connection, order_id):
+    with connection.cursor() as cursor:
+        cursor.execute('SELECT coupon_discount,points_used FROM orders WHERE order_id=%s', (order_id,))
+        order = cursor.fetchone()
+        cursor.execute('SELECT order_item_id,quantity,unit_price FROM order_items WHERE order_id=%s ORDER BY order_item_id', (order_id,))
+        return line_allocations(cursor.fetchall(), int(order['coupon_discount']), int(order['points_used']))
+
+
+def _point_entitlement(connection, order_id):
+    allocations = _allocation(connection, order_id)
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT refund_type FROM refunds WHERE order_id=%s AND refund_status='SUCCEEDED'", (order_id,))
+        if any(row['refund_type']=='ORDER_CANCEL' for row in cursor.fetchall()):
+            return sum(value[1] for value in allocations.values())
+        cursor.execute("""SELECT ri.order_item_id,SUM(ri.quantity) AS quantity FROM refund_items ri
+            JOIN refunds r ON r.refund_id=ri.refund_id WHERE r.order_id=%s AND r.refund_status='SUCCEEDED'
+            GROUP BY ri.order_item_id""", (order_id,))
+        return sum(quantity_share(allocations[row['order_item_id']][1], allocations[row['order_item_id']][2], 0, int(row['quantity'])) for row in cursor.fetchall())
+
+
 @router.post("", response_model=RefundResponse, status_code=status.HTTP_201_CREATED)
-def create_refund(request: RefundCreateRequest) -> RefundResponse:
+def create_refund(request: RefundCreateRequest, _: CurrentEmployee = Depends(require_permission('REFUND_MANAGE'))) -> RefundResponse:
     """Reserve a refund amount while locking its original payment."""
 
     try:
         validate_refund_items(request.refundType, request.refundAmount, request.items)
+        if request.refundType == 'MANUAL_ADJUSTMENT' and request.refundAmount == 0:
+            raise ValueError('Manual adjustment requires a positive amount')
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
 
@@ -150,6 +208,10 @@ def create_refund(request: RefundCreateRequest) -> RefundResponse:
                             raise HTTPException(status_code=409, detail="Idempotency key was used for another refund")
                         return _refund_response(existing)
 
+                    cursor.execute('SELECT purchase_confirmed_at FROM orders WHERE order_id=%s FOR UPDATE', (order_id,))
+                    if cursor.fetchone()['purchase_confirmed_at'] is not None:
+                        raise HTTPException(409, '구매확정된 주문은 환불할 수 없습니다.')
+
                     cursor.execute(
                         """
                         SELECT COALESCE(SUM(refund_amount), 0) AS reserved_amount
@@ -170,12 +232,21 @@ def create_refund(request: RefundCreateRequest) -> RefundResponse:
                         if request.returnRequestId is None:
                             raise HTTPException(status_code=422, detail="RETURN refund requires returnRequestId")
                         cursor.execute(
-                            "SELECT return_request_id FROM return_requests WHERE return_request_id=%s AND order_id=%s FOR UPDATE",
+                            "SELECT return_request_id FROM return_requests WHERE return_request_id=%s AND order_id=%s AND request_status='APPROVED' AND inspection_result='ACCEPTED' FOR UPDATE",
                             (request.returnRequestId, order_id),
                         )
                         if cursor.fetchone() is None:
                             raise HTTPException(status_code=409, detail="Return request does not belong to the payment order")
                         _validate_return_items(connection, order_id, request.items)
+                        cursor.execute('SELECT order_item_id,quantity FROM return_items WHERE return_request_id=%s', (request.returnRequestId,))
+                        approved = {int(row['order_item_id']): int(row['quantity']) for row in cursor.fetchall()}
+                        if approved != {item.orderItemId: item.quantity for item in request.items}:
+                            raise HTTPException(409, 'Refund must match inspected return items')
+                        allocations = _allocation(connection, order_id)
+                        for item in request.items:
+                            cash, points, quantity = allocations[item.orderItemId]
+                            if item.refundAmount != quantity_share(cash, quantity, 0, item.quantity):
+                                raise HTTPException(409, 'Refund amount differs from allocated payment')
                     elif request.returnRequestId is not None:
                         raise HTTPException(status_code=422, detail="Only RETURN refunds can reference a return request")
 
@@ -221,7 +292,7 @@ def create_refund(request: RefundCreateRequest) -> RefundResponse:
 
 
 @router.post("/{refund_id}/complete", response_model=RefundResponse)
-def complete_refund(refund_id: int, request: RefundCompleteRequest) -> RefundResponse:
+def complete_refund(refund_id: int, request: RefundCompleteRequest, _: CurrentEmployee = Depends(require_permission('REFUND_MANAGE'))) -> RefundResponse:
     """Record provider success and restore an eligible coupon atomically."""
 
     try:
@@ -245,8 +316,12 @@ def complete_refund(refund_id: int, request: RefundCompleteRequest) -> RefundRes
                         return _refund_response(refund)
                     if refund["refund_status"] == "CANCELED":
                         raise HTTPException(status_code=409, detail="Canceled refund cannot be completed")
+                    cursor.execute('SELECT purchase_confirmed_at FROM orders WHERE order_id=%s FOR UPDATE', (refund['order_id'],))
+                    if cursor.fetchone()['purchase_confirmed_at'] is not None:
+                        raise HTTPException(409, '구매확정된 주문은 환불할 수 없습니다.')
 
                     retry_increment = 1 if refund["refund_status"] == "FAILED" else 0
+                    before_points = _point_entitlement(connection, int(refund['order_id']))
                     cursor.execute(
                         """
                         UPDATE refunds
@@ -267,6 +342,12 @@ def complete_refund(refund_id: int, request: RefundCompleteRequest) -> RefundRes
                     )
                     succeeded_amount = int(cursor.fetchone()["succeeded_amount"])
                     is_full_refund = succeeded_amount == int(refund["payment_amount"])
+                    if refund['refund_type'] == 'RETURN':
+                        cursor.execute("""SELECT COUNT(*) AS remaining FROM order_items oi
+                            WHERE oi.order_id=%s AND oi.quantity>(SELECT COALESCE(SUM(ri.quantity),0)
+                            FROM refund_items ri JOIN refunds r ON r.refund_id=ri.refund_id
+                            WHERE ri.order_item_id=oi.order_item_id AND r.refund_status='SUCCEEDED')""", (refund['order_id'],))
+                        is_full_refund = is_full_refund and cursor.fetchone()['remaining'] == 0
                     cursor.execute(
                         "UPDATE payments SET payment_status=%s WHERE payment_id=%s",
                         ("REFUNDED" if is_full_refund else "PARTIALLY_REFUNDED", refund["payment_id"]),
@@ -319,6 +400,10 @@ def complete_refund(refund_id: int, request: RefundCompleteRequest) -> RefundRes
                                 )
                                 restored_coupon_count += 1
 
+                    target_points = _point_entitlement(connection, int(refund['order_id']))
+                    _restore_used_points(connection, int(refund['order_id']), refund_id, before_points, target_points)
+                    if refund['return_request_id'] is not None:
+                        cursor.execute("UPDATE return_requests SET request_status='COMPLETED',processed_at=NOW() WHERE return_request_id=%s", (refund['return_request_id'],))
                     if is_full_refund:
                         record_order_status(
                             connection,

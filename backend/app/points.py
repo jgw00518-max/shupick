@@ -152,7 +152,7 @@ def get_wallet(current: CurrentCustomer = Depends(get_current_customer)) -> Poin
     )
 
 
-@router.post("/credit", response_model=PointTransactionResponse)
+# 신규 적립은 reviews.save_review의 구매 항목별 최초 작성에서만 허용한다.
 def credit_points(
     request: PointCreditRequest,
     _: CurrentEmployee = Depends(require_permission("POINT_MANAGE")),

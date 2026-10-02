@@ -6,7 +6,6 @@ import 'localization.dart';
 
 import '../app/store_controller.dart';
 import '../app/store_navigation_controller.dart';
-import '../data/mock_repositories.dart';
 import '../domain/repositories.dart';
 import '../domain/models.dart';
 import 'screens/account_screens.dart';
@@ -389,8 +388,8 @@ class _StoreShellState extends State<StoreShell> {
           .firstOrNull,
       onOrders: () => go(StorePage.orders),
     ),
-    StorePage.coupons => const CouponsScreen(),
-    StorePage.points => const PointsScreen(),
+    StorePage.coupons => CouponsScreen(store: store),
+    StorePage.points => PointsScreen(store: store),
     StorePage.inquiry => InquiryScreen(
       store: store,
       product: inquiryProduct,
@@ -479,7 +478,7 @@ class _StoreShellState extends State<StoreShell> {
               style: TextStyle(color: Color(0xFF999999), fontSize: 12),
             ),
           ),
-          for (final entry in MockProductRepository.categoryTree.entries) ...[
+          for (final entry in store.categoryTree.entries) ...[
             ListTile(
               contentPadding: const EdgeInsets.symmetric(horizontal: 20),
               title: LText(entry.key),

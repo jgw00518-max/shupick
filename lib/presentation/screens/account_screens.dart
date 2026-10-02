@@ -33,7 +33,15 @@ class ProfileScreen extends StatelessWidget {
         ),
       ] else ...[
         SectionTitle('${store.userName ?? '사용자'} 님'),
-        const LText('PLATINUM MEMBER · 다음 VIP까지 128,000원'),
+        LText(
+          '${(store.accountBenefits?['membership'] as Map?)?['tier_name'] ?? '등급 산정 대기'}',
+        ),
+        TextButton(
+          onPressed: store.benefitsLoading ? null : store.refreshBenefits,
+          child: const LText('회원 혜택 새로고침'),
+        ),
+        if (store.benefitsLoading) const LinearProgressIndicator(),
+        if (store.benefitsError != null) LText(store.benefitsError!),
         const SizedBox(height: 16),
         Card(
           child: Padding(
@@ -50,8 +58,10 @@ class ProfileScreen extends StatelessWidget {
                       .take(2)
                       .join(),
                 ),
-                LText('VIP 등급 78%'),
-                LText('PLATINUM'),
+                LText(
+                  '등급 산정 구매확정 금액 ${won(((store.accountBenefits?['membership'] as Map?)?['net_purchase_amount'] as int?) ?? 0)}',
+                ),
+                const LText('등급은 매월 산정되며 당월 말일까지 유지됩니다.'),
               ],
             ),
           ),
@@ -61,17 +71,24 @@ class ProfileScreen extends StatelessWidget {
             Expanded(
               child: TextButton(
                 onPressed: () => onGo(StorePage.coupons),
-                child: const LText('쿠폰 4장'),
+                child: LText(
+                  '쿠폰 ${(store.accountBenefits?['coupons'] as List?)?.length ?? 0}장',
+                ),
               ),
             ),
             Expanded(
               child: TextButton(
                 onPressed: () => onGo(StorePage.points),
-                child: const LText('적립금 32,500P'),
+                child: LText(
+                  '적립금 ${(store.accountBenefits?['wallet'] as Map?)?['balance'] ?? 0}P',
+                ),
               ),
             ),
-            const Expanded(
-              child: TextButton(onPressed: null, child: LText('리뷰 12개')),
+            Expanded(
+              child: TextButton(
+                onPressed: null,
+                child: LText('리뷰 ${store.reviews.length}개'),
+              ),
             ),
           ],
         ),

@@ -11,6 +11,7 @@ from pymysql.connections import Connection
 
 from .auth import CurrentCustomer, CurrentEmployee, get_current_customer, require_permission
 from .database import mysql_connection
+from .checkout_benefits import apply_benefits
 from .outbox import enqueue_outbox_event
 from .schemas import (
     OrderCancelRequest,
@@ -48,7 +49,7 @@ def _order_response(
 ) -> OrderTransactionResponse:
     with connection.cursor() as cursor:
         cursor.execute(
-            "SELECT order_number,order_status FROM orders WHERE order_id=%s",
+            "SELECT order_number,order_status,paid_total,coupon_discount,points_used FROM orders WHERE order_id=%s",
             (order_id,),
         )
         order = cursor.fetchone()
@@ -68,6 +69,9 @@ def _order_response(
         reservedQuantity=reserved_quantity,
         paymentId=payment_id,
         fulfillmentId=fulfillment_id,
+        paidTotal=int(order["paid_total"]),
+        couponDiscount=int(order["coupon_discount"]),
+        pointsUsed=int(order["points_used"]),
     )
 
 
@@ -350,7 +354,11 @@ def reserve_order(
 
 
 @router.post("/orders/{order_id}/payments/complete", response_model=OrderTransactionResponse)
-def complete_payment(order_id: int, request: PaymentCompleteRequest) -> OrderTransactionResponse:
+def complete_payment(
+    order_id: int,
+    request: PaymentCompleteRequest,
+    current: CurrentCustomer = Depends(get_current_customer),
+) -> OrderTransactionResponse:
     """Confirm payment and create the headquarters-to-branch fulfillment."""
 
     try:
@@ -361,6 +369,8 @@ def complete_payment(order_id: int, request: PaymentCompleteRequest) -> OrderTra
                     order = cursor.fetchone()
                     if order is None:
                         raise HTTPException(status_code=404, detail="Order not found")
+                    if int(order["customer_id"]) != current.customer_id:
+                        raise HTTPException(status_code=403, detail="Order belongs to another customer")
                     cursor.execute("SELECT payment_id,order_id FROM payments WHERE transaction_key=%s", (request.transactionKey,))
                     existing_payment = cursor.fetchone()
                     if existing_payment is not None:
@@ -388,6 +398,10 @@ def complete_payment(order_id: int, request: PaymentCompleteRequest) -> OrderTra
                     cursor.execute("SELECT COUNT(*) AS count FROM order_items WHERE order_id=%s", (order_id,))
                     if active_count != int(cursor.fetchone()["count"]):
                         raise HTTPException(status_code=409, detail="Inventory reservation expired or was released")
+
+                    order["paid_total"] = apply_benefits(
+                        connection, order, request.customerCouponId, request.pointsUsed
+                    )
 
                     cursor.execute(
                         """
@@ -440,7 +454,11 @@ def complete_payment(order_id: int, request: PaymentCompleteRequest) -> OrderTra
 
 
 @router.post("/orders/{order_id}/payments/fail", response_model=OrderTransactionResponse)
-def fail_payment(order_id: int, request: PaymentFailRequest) -> OrderTransactionResponse:
+def fail_payment(
+    order_id: int,
+    request: PaymentFailRequest,
+    current: CurrentCustomer = Depends(get_current_customer),
+) -> OrderTransactionResponse:
     """Record a failed attempt and return all reserved stock."""
 
     try:
@@ -451,6 +469,8 @@ def fail_payment(order_id: int, request: PaymentFailRequest) -> OrderTransaction
                     order = cursor.fetchone()
                     if order is None:
                         raise HTTPException(status_code=404, detail="Order not found")
+                    if int(order["customer_id"]) != current.customer_id:
+                        raise HTTPException(status_code=403, detail="Order belongs to another customer")
                     if order["order_status"] != "PENDING_PAYMENT":
                         raise HTTPException(status_code=409, detail="Order is not awaiting payment")
                     cursor.execute(

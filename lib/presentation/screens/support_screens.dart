@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../localization.dart';
 import 'package:flutter/services.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../app/store_controller.dart';
+import '../../data/api_order_repository.dart';
 import '../../domain/models.dart';
 import '../shared/store_widgets.dart';
 
@@ -23,153 +25,133 @@ class ShippingScreen extends StatefulWidget {
 }
 
 class _ShippingScreenState extends State<ShippingScreen> {
-  bool copied = false;
-  static const tracking = '5012-8473-1190';
+  Map<String, dynamic>? tracking;
+  String? error;
+  bool loading = true;
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
+  _statusSubscription;
+  String? realtimeError;
 
-  Future<void> _call(String number) async {
-    try {
-      if (!await launchUrl(Uri(scheme: 'tel', path: number)) && mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: LText('전화 앱을 열 수 없습니다.')));
-      }
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: LText('전화 앱을 열 수 없습니다.')));
-      }
+  @override
+  void initState() {
+    super.initState();
+    _load();
+    final id = widget.order?.id;
+    if (id != null && widget.store.orderRepository is ApiOrderRepository) {
+      _statusSubscription = FirebaseFirestore.instance
+          .collection('orderStatuses')
+          .doc('$id')
+          .snapshots()
+          .listen(
+            (snapshot) {
+              if (snapshot.exists && mounted) {
+                setState(() => realtimeError = null);
+                _load();
+                widget.store.refreshOrders();
+              }
+            },
+            onError: (Object _) {
+              if (mounted) setState(() => realtimeError = '실시간 연결 오류');
+            },
+          );
     }
   }
 
-  Future<void> _cancel(StoreOrder order) async {
-    final yes = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const LText('주문을 취소할까요?'),
-        content: const LText('대리점에서 상품을 수령하기 전까지만 취소할 수 있습니다.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const LText('닫기'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const LText('주문 취소'),
-          ),
-        ],
-      ),
-    );
-    if (yes != true) return;
-    await widget.store.cancelOrder(order);
-    widget.onOrders();
+  @override
+  void dispose() {
+    _statusSubscription?.cancel();
+    super.dispose();
   }
+
+  /// 새로고침 시 MySQL의 상태와 실제 대리점 정보를 다시 읽습니다.
+  Future<void> _load() async {
+    setState(() {
+      loading = true;
+      error = null;
+    });
+    try {
+      final repository = widget.store.orderRepository;
+      final id = widget.order?.id;
+      if (repository is! ApiOrderRepository || id == null) {
+        throw StateError('조회할 서버 주문이 없습니다.');
+      }
+      final result = await repository.getTracking(id);
+      if (mounted) setState(() => tracking = result);
+    } catch (_) {
+      if (mounted) setState(() => error = '배송 정보를 불러오지 못했습니다.');
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
+  }
+
+  String _status(String value) => switch (value) {
+    'PENDING_PAYMENT' => '결제 대기',
+    'PAID' => '결제 완료',
+    'PREPARING' => '상품 준비',
+    'SHIPPING' => '대리점 이동 중',
+    'READY_FOR_PICKUP' => '픽업 가능',
+    'COMPLETED' => '수령 완료',
+    'CANCELED' => '취소 완료',
+    'REFUNDED' => '환불 완료',
+    _ => value,
+  };
 
   @override
   Widget build(BuildContext context) {
-    final order = widget.order;
-    if (order == null) return const EmptyState('조회할 주문이 없습니다.');
-    const steps = [
-      ('본사 출고 준비', '09.28 09:10', '상품 검수와 포장이 완료되었습니다.'),
-      ('본사 출고', '09.28 14:25', 'SHUPICK 본사 물류센터에서 출발했습니다.'),
-      ('대리점 이동 중', '09.29 08:40', '대리점으로 이동하고 있습니다.'),
-      ('대리점 도착', '09.29 13:42', '픽업 장소에 상품이 준비되었습니다.'),
-      ('고객 픽업 완료', '픽업 후 반영', '고객에게 상품 전달이 완료되었습니다.'),
-    ];
+    if (widget.order == null) return const EmptyState('조회할 주문이 없습니다.');
+    final data = tracking;
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
         const SectionTitle('픽업 배송 조회'),
-        const LText('본사에서 대리점까지의 배송과 픽업 상태를 확인하세요.'),
-        const SizedBox(height: 18),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const LText('픽업 가능'),
-                LText(
-                  '${order.district} 대리점에 도착했습니다',
-                  style: const TextStyle(
-                    fontSize: 19,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const LText('영업시간 안에 방문하여 QR 코드를 보여주세요.'),
-              ],
+        TextButton(
+          onPressed: loading ? null : _load,
+          child: const LText('새로고침'),
+        ),
+        if (loading) const LinearProgressIndicator(),
+        if (error != null) LText(error!),
+        if (realtimeError != null)
+          const LText('실시간 연결을 확인해주세요. 새로고침으로 조회할 수 있습니다.'),
+        if (data != null) ...[
+          LText(
+            _status(data['order_status'] as String),
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+          LText('주문 번호 ${data['order_number']}'),
+          Card(
+            child: ListTile(
+              title: LText('${data['branch_name']}'),
+              subtitle: LText('${data['address']}\n${data['phone']}'),
             ),
           ),
-        ),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const LText('픽업 대리점'),
-                LText(
-                  'SHUPICK ${order.district}점',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-                const LText('서울 성동구 왕십리로 83, 1층'),
-                const LText('오늘 10:30 - 20:00'),
-                TextButton(
-                  onPressed: () => _call('02-2299-0245'),
-                  child: const LText('대리점 전화'),
-                ),
-              ],
+          for (final hour in data['businessHours'] as List)
+            LText(
+              '${const ['월', '화', '수', '목', '금', '토', '일'][(hour['day_of_week'] as int) - 1]}요일 · ${hour['is_closed'] == 1 || hour['is_closed'] == true ? '휴무' : '${hour['opens_at']} ~ ${hour['closes_at']}'}',
             ),
-          ),
-        ),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const LText('운송사 · CJ대한통운 기업배송'),
-                const LText('운송장 번호 · $tracking'),
-                TextButton(
-                  onPressed: () async {
-                    await Clipboard.setData(
-                      const ClipboardData(text: tracking),
-                    );
-                    if (mounted) setState(() => copied = true);
-                  },
-                  child: LText(copied ? '복사됨 ✓' : '번호 복사'),
-                ),
-              ],
-            ),
-          ),
-        ),
-        Row(
-          children: [
+          if (data['tracking_number'] != null)
+            LText('운송장 번호 ${data['tracking_number']}'),
+          if (data['arrived_at'] != null) LText('대리점 도착 ${data['arrived_at']}'),
+          if (data['pickup_deadline_at'] != null)
+            LText('픽업 기한 ${data['pickup_deadline_at']}'),
+          if (data['order_status'] == 'READY_FOR_PICKUP') ...[
+            const LText('수령 시 아래 결제 코드를 직원에게 보여주세요.'),
+            SelectableText(data['order_number'] as String),
             TextButton(
-              onPressed: () => _call('1588-1255'),
-              child: const LText('운송사 연결'),
-            ),
-            TextButton(
-              onPressed: () => _call('02-2299-0245'),
-              child: const LText('대리점 문의'),
+              onPressed: () => Clipboard.setData(
+                ClipboardData(text: data['order_number'] as String),
+              ),
+              child: const LText('코드 복사'),
             ),
           ],
-        ),
-        const SectionTitle('배송 현황'),
-        for (var index = 0; index < steps.length; index++)
-          ListTile(
-            leading: Icon(
-              index <= 3 ? Icons.check_circle : Icons.circle_outlined,
-              color: index <= 3 ? brandBlue : Colors.grey,
+          if (data['picked_up_at'] != null)
+            LText('수령 완료 ${data['picked_up_at']}'),
+          const SectionTitle('상태 변경 이력'),
+          for (final entry in data['history'] as List)
+            ListTile(
+              title: LText(_status(entry['new_status'] as String)),
+              subtitle: LText('${entry['changed_at']}'),
             ),
-            title: LText(steps[index].$1),
-            subtitle: LText('${steps[index].$2} · ${steps[index].$3}'),
-          ),
-        if (!order.canceled)
-          OutlinedButton(
-            onPressed: () => _cancel(order),
-            child: const LText('주문 취소'),
-          ),
+        ],
         OutlinedButton(
           onPressed: widget.onOrders,
           child: const LText('주문 내역으로 돌아가기'),
@@ -179,123 +161,111 @@ class _ShippingScreenState extends State<ShippingScreen> {
   }
 }
 
-/// 목업 쿠폰의 수령 상태만 변경하며 실제 발급은 하지 않습니다.
-class CouponsScreen extends StatefulWidget {
-  const CouponsScreen({super.key});
+/// 서버에서 발급한 쿠폰 원장을 표시합니다.
+class CouponsScreen extends StatelessWidget {
+  const CouponsScreen({super.key, required this.store});
+  final StoreController store;
   @override
-  State<CouponsScreen> createState() => _CouponsScreenState();
+  Widget build(BuildContext context) =>
+      _BenefitsView(store: store, coupons: true);
 }
 
-class _CouponsScreenState extends State<CouponsScreen> {
-  final Set<int> received = {};
+/// 잔액·적립 건별 만료일·최근 포인트 원장을 표시합니다.
+class PointsScreen extends StatelessWidget {
+  const PointsScreen({super.key, required this.store});
+  final StoreController store;
+  @override
+  Widget build(BuildContext context) =>
+      _BenefitsView(store: store, coupons: false);
+}
+
+class _BenefitsView extends StatefulWidget {
+  const _BenefitsView({required this.store, required this.coupons});
+  final StoreController store;
+  final bool coupons;
+  @override
+  State<_BenefitsView> createState() => _BenefitsViewState();
+}
+
+class _BenefitsViewState extends State<_BenefitsView> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _reload();
+    });
+  }
+
+  Future<void> _reload() async {
+    await widget.store.refreshBenefits();
+    if (mounted) setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
-    const coupons = [
-      ('10%', '신규 회원 웰컴 쿠폰', '최소 50,000원 · 전 카테고리'),
-      ('5,000원', '앱 첫 구매 할인', '최소 30,000원 · 전 카테고리'),
-      ('무료 배송', 'VIP 무료 배송 쿠폰', '최소 금액 없음 · 전 카테고리'),
-      ('15%', '운동화 기획전 쿠폰', '최소 100,000원 · 운동화 카테고리'),
-    ];
+    final store = widget.store;
+    final data = store.accountBenefits;
+    final coupons = (data?['coupons'] as List?) ?? [];
+    final wallet = data?['wallet'] as Map<String, dynamic>?;
+    final lots = (wallet?['lots'] as List?) ?? [];
+    final history = (data?['pointHistory'] as List?) ?? [];
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       children: [
-        const SectionTitle('쿠폰'),
-        const LText('사용 가능한 쿠폰 4장'),
-        const SizedBox(height: 12),
-        const Row(
-          children: [LText('사용 가능'), SizedBox(width: 20), LText('사용 완료')],
+        SectionTitle(widget.coupons ? '쿠폰' : '적립금'),
+        TextButton(
+          onPressed: store.benefitsLoading ? null : _reload,
+          child: const LText('새로고침'),
         ),
-        const SizedBox(height: 12),
-        for (var index = 0; index < coupons.length; index++)
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Row(
-                children: [
-                  LText(
-                    coupons[index].$1,
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: brandBlue,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        LText(
-                          coupons[index].$2,
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        LText(
-                          '${coupons[index].$3}\n10월 31일까지',
-                          style: const TextStyle(fontSize: 11),
-                        ),
-                      ],
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: received.contains(index)
-                        ? null
-                        : () => setState(() => received.add(index)),
-                    child: LText(received.contains(index) ? '받음' : '받기'),
-                  ),
-                ],
+        if (store.benefitsLoading) const LinearProgressIndicator(),
+        if (store.benefitsError != null) LText(store.benefitsError!),
+        if (data == null &&
+            !store.benefitsLoading &&
+            store.benefitsError == null)
+          const LText('로그인 후 회원 혜택을 확인해주세요.'),
+        if (widget.coupons && data != null) ...[
+          LText('사용 가능한 쿠폰 ${coupons.length}장'),
+          if (coupons.isEmpty) const LText('사용 가능한 쿠폰이 없습니다.'),
+          for (final coupon in coupons)
+            Card(
+              child: ListTile(
+                title: LText('${coupon['name']}'),
+                subtitle: LText(
+                  '최소 주문 ${won(coupon['minimumOrderAmount'] as int)}\n사용 기한 ${coupon['expiresAt']} 이전',
+                ),
+                trailing: LText(
+                  coupon['discountType'] == 'PERCENT'
+                      ? '${coupon['discountValue']}%'
+                      : won(coupon['discountValue'] as int),
+                ),
               ),
             ),
+        ],
+        if (!widget.coupons && data != null) ...[
+          LText(
+            '사용 가능 적립금 ${wallet?['balance'] ?? 0}P',
+            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
           ),
+          const LText('포인트는 각 적립일을 기준으로 1년 후 만료됩니다.'),
+          const SectionTitle('만료 예정 포인트'),
+          if (lots.isEmpty) const LText('사용 가능한 적립 포인트가 없습니다.'),
+          for (final lot in lots)
+            ListTile(
+              title: LText('${lot['remainingAmount']}P'),
+              subtitle: LText('만료 ${lot['expiresAt']}'),
+            ),
+          const SectionTitle('최근 포인트 내역'),
+          if (history.isEmpty) const LText('포인트 내역이 없습니다.'),
+          for (final entry in history)
+            ListTile(
+              title: LText(
+                '${entry['description'] ?? entry['transaction_type']}',
+              ),
+              subtitle: LText('${entry['created_at']}'),
+              trailing: LText('${entry['point_amount']}P'),
+            ),
+        ],
       ],
     );
   }
-}
-
-class PointsScreen extends StatelessWidget {
-  const PointsScreen({super.key});
-  @override
-  Widget build(BuildContext context) => ListView(
-    padding: const EdgeInsets.all(20),
-    children: [
-      const SectionTitle('적립금'),
-      const LText('쇼핑할수록 쌓이는 SHUPICK 포인트'),
-      const SizedBox(height: 22),
-      Card(
-        color: brandBlue,
-        child: Padding(
-          padding: const EdgeInsets.all(22),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: const [
-              LText('사용 가능 적립금', style: TextStyle(color: Colors.white70)),
-              LText(
-                '32,500P',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 30,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              LText(
-                '30일 이내 소멸 예정 1,200P',
-                style: TextStyle(color: Colors.white70),
-              ),
-            ],
-          ),
-        ),
-      ),
-      const SizedBox(height: 22),
-      const SectionTitle('적립 내역'),
-      for (final item in [
-        ('구매 적립', 'Aero Shift 01 구매', '+3,780P'),
-        ('리뷰 적립', '포토 리뷰 작성', '+1,000P'),
-        ('주문 사용', 'Silver Current 주문', '-12,000P'),
-      ])
-        ListTile(
-          title: LText(item.$1),
-          subtitle: LText(item.$2),
-          trailing: LText(item.$3),
-        ),
-    ],
-  );
 }

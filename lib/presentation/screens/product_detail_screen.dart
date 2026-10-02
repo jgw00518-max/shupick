@@ -7,6 +7,8 @@ import '../../app/store_controller.dart';
 import '../../domain/models.dart';
 import '../shared/store_widgets.dart';
 import 'review_sheet.dart';
+import '../../data/api_review_repository.dart';
+import 'public_reviews.dart';
 
 /// 상품 정보·배송 정책·리뷰와 구매 옵션을 원본 흐름대로 분리합니다.
 class ProductDetailScreen extends StatefulWidget {
@@ -34,10 +36,73 @@ class ProductDetailScreen extends StatefulWidget {
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
   late String color;
   String tab = '상품 정보';
+  Map<String, dynamic>? publicReviewData;
+  bool reviewsLoading = false;
+  String? reviewsError;
+  Map<int, ProductReview> ownedPublicReviews = {};
+  String? ownedReviewEmail;
+
+  /// 공개 목록과 집계는 동일 서버 응답을 사용하여 내 리뷰를 이중 계산하지 않습니다.
+  Future<void> loadPublicReviews({bool more = false}) async {
+    final repository = widget.store.reviewRepository;
+    if (repository is! ApiReviewRepository || reviewsLoading) return;
+    setState(() {
+      reviewsLoading = true;
+      reviewsError = null;
+    });
+    try {
+      final previous = more
+          ? (publicReviewData?['items'] as List? ?? [])
+          : <dynamic>[];
+      final result = await repository.getProductReviews(
+        widget.product.id,
+        offset: previous.length,
+      );
+      // 공개 응답은 익명으로 유지하고, 인증된 내 리뷰 ID와 로컬에서만 연결합니다.
+      final email = widget.store.userEmail;
+      final owned = widget.store.isLoggedIn
+          ? await repository.getReviews()
+          : <ProductReview>[];
+      if (!mounted) return;
+      setState(() {
+        ownedReviewEmail = email;
+        ownedPublicReviews = {
+          for (final review in owned)
+            if (review.id != null) review.id!: review,
+        };
+        publicReviewData = {
+          ...result,
+          'items': [...previous, ...result['items'] as List],
+        };
+      });
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          reviewsError = error.toString();
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          reviewsLoading = false;
+        });
+      }
+    }
+  }
+
+  String get reviewSummary =>
+      widget.store.reviewRepository is ApiReviewRepository
+      ? reviewsError != null
+            ? '리뷰 조회 실패'
+            : publicReviewData == null
+            ? '리뷰 불러오는 중'
+            : '${(publicReviewData!['average'] as num).toStringAsFixed(1)} / 5 · 리뷰 ${publicReviewData!['count']}개'
+      : '데모 리뷰 ${widget.product.reviewCount}개';
   @override
   void initState() {
     super.initState();
     color = widget.product.color;
+    loadPublicReviews();
   }
 
   List<Product> get recommendations {
@@ -50,9 +115,15 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     };
     final ids = next[widget.product.id];
     if (ids != null) {
-      return ids
-          .map((id) => widget.store.products.firstWhere((p) => p.id == id))
+      final matched = ids
+          .map(
+            (id) => widget.store.products
+                .where((product) => product.id == id)
+                .firstOrNull,
+          )
+          .whereType<Product>()
           .toList();
+      if (matched.isNotEmpty) return matched;
     }
     return widget.store.products
         .where(
@@ -182,7 +253,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     ),
                     const SizedBox(height: 4),
                     LText(
-                      '★★★★★  4.8 · 리뷰 ${widget.product.reviewCount + ownReviews.length}개',
+                      reviewSummary,
                       style: TextStyle(fontSize: 14, color: muted),
                     ),
                     const SizedBox(height: 24),
@@ -254,7 +325,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               ),
                             ),
                           ),
-                          LText('30일 무료 교환', style: TextStyle(fontSize: 14)),
+                          LText('수령 후 7일 반품', style: TextStyle(fontSize: 14)),
                         ],
                       ),
                     ),
@@ -336,7 +407,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               const Divider(height: 1),
               Row(
                 children: [
-                  for (final value in ['상품 정보', '배송·교환 안내', '리뷰'])
+                  for (final value in ['상품 정보', '배송·반품 안내', '리뷰'])
                     Expanded(
                       child: InkWell(
                         onTap: () => setState(() => tab = value),
@@ -371,7 +442,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(18, 20, 18, 70),
                 child: switch (tab) {
-                  '배송·교환 안내' => _delivery(),
+                  '배송·반품 안내' => _delivery(),
                   '리뷰' => _reviews(ownReviews),
                   _ => _information(),
                 },
@@ -573,198 +644,244 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       ),
       SizedBox(height: 14),
       LText(
-        '평일 오후 2시 이전 주문은 당일 출고됩니다. 기본 배송비는 무료입니다.',
+        '결제 완료 후 본사에서 선택한 대리점으로 출고합니다. 대리점 도착 상태를 확인한 후 방문해주세요.',
         style: TextStyle(fontSize: 14, height: 1.6),
       ),
       SizedBox(height: 30),
       LText(
-        '교환 안내',
+        '반품 안내',
         style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
       ),
       SizedBox(height: 14),
       LText(
-        '수령 후 30일 이내 미착용 상품은 사이즈 교환이 가능합니다. 사용 흔적 또는 포장 훼손 시 제한될 수 있습니다.',
+        '수령 후 7일 이내 미착용·상품 훼손 없음·구성품과 포장 유지 조건으로 반품을 신청할 수 있습니다. 상품 불량과 오배송은 별도로 검수합니다.',
         style: TextStyle(fontSize: 14, height: 1.6),
       ),
     ],
   );
 
-  Widget _reviews(List<ProductReview> ownReviews) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          border: Border.all(color: const Color(0xFFE8E8E8)),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
+  Widget _reviews(List<ProductReview> ownReviews) =>
+      widget.store.reviewRepository is ApiReviewRepository
+      ? PublicReviews(
+          data: publicReviewData,
+          loading: reviewsLoading,
+          error: reviewsError,
+          onReload: () => loadPublicReviews(),
+          onMore: () => loadPublicReviews(more: true),
+          ownedReviews:
+              widget.store.isLoggedIn &&
+                  ownedReviewEmail == widget.store.userEmail
+              ? ownedPublicReviews
+              : const {},
+          onEdit: _editReview,
+          onDelete: _deleteReview,
+        )
+      : Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Row(
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                border: Border.all(color: const Color(0xFFE8E8E8)),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Expanded(
+                        child: LText(
+                          '사이즈 추천',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      LText(
+                        '실제 구매 후기 통계 · 예시 데이터',
+                        style: TextStyle(fontSize: 11, color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                  const Divider(height: 30),
+                  _fitMetric(
+                    '사이즈',
+                    '정사이즈 74%',
+                    .74,
+                    '작아요 18%',
+                    '정사이즈 74%',
+                    '커요 8%',
+                  ),
+                  const SizedBox(height: 18),
+                  _fitMetric(
+                    '발볼',
+                    '적당함 78%',
+                    .78,
+                    '좁아요 12%',
+                    '적당함 78%',
+                    '넓어요 10%',
+                  ),
+                  const SizedBox(height: 18),
+                  _fitMetric(
+                    '착화감',
+                    '편함 82%',
+                    .82,
+                    '보통 11%',
+                    '편함 82%',
+                    '불편함 7%',
+                  ),
+                  const SizedBox(height: 22),
+                  const LText(
+                    '사이즈 선택에 참고해주세요. 개인의 발 모양에 따라 착화감은 달라질 수 있어요.',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 26),
+            Row(
               children: [
                 Expanded(
                   child: LText(
-                    '사이즈 추천',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                    '리뷰 ${widget.product.reviewCount + ownReviews.length}',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
-                LText(
-                  '실제 구매 후기 통계 · 예시 데이터',
-                  style: TextStyle(fontSize: 11, color: Colors.grey),
+                const LText(
+                  '리뷰는 주문 내역에서 작성할 수 있어요.',
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
                 ),
               ],
             ),
-            const Divider(height: 30),
-            _fitMetric('사이즈', '정사이즈 74%', .74, '작아요 18%', '정사이즈 74%', '커요 8%'),
-            const SizedBox(height: 18),
-            _fitMetric('발볼', '적당함 78%', .78, '좁아요 12%', '적당함 78%', '넓어요 10%'),
-            const SizedBox(height: 18),
-            _fitMetric('착화감', '편함 82%', .82, '보통 11%', '편함 82%', '불편함 7%'),
-            const SizedBox(height: 22),
-            const LText(
-              '사이즈 선택에 참고해주세요. 개인의 발 모양에 따라 착화감은 달라질 수 있어요.',
-              style: TextStyle(fontSize: 12, color: Colors.grey),
-            ),
-          ],
-        ),
-      ),
-      const SizedBox(height: 26),
-      Row(
-        children: [
-          Expanded(
-            child: LText(
-              '리뷰 ${widget.product.reviewCount + ownReviews.length}',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-            ),
-          ),
-          const LText(
-            '리뷰는 주문 내역에서 작성할 수 있어요.',
-            style: TextStyle(fontSize: 12, color: Colors.grey),
-          ),
-        ],
-      ),
-      const SizedBox(height: 14),
-      const Row(
-        children: [
-          LText(
-            '4.8',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
-          ),
-          SizedBox(width: 5),
-          LText(
-            '★★★★★',
-            style: TextStyle(fontSize: 15, color: Color(0xFF455B77)),
-          ),
-        ],
-      ),
-      const SizedBox(height: 18),
-      for (final review in ownReviews)
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            const SizedBox(height: 14),
+            const Row(
               children: [
-                Row(
-                  children: [
-                    const Expanded(child: LText('내 리뷰')),
-                    TextButton(
-                      onPressed: () => _editReview(review),
-                      child: const LText('수정'),
-                    ),
-                    TextButton(
-                      onPressed: () => _deleteReview(review),
-                      child: const LText('삭제'),
-                    ),
-                  ],
-                ),
                 LText(
-                  '사이즈 · ${review.fitSize}   발볼 · ${review.fitWidth}   착화감 · ${review.fitComfort}',
+                  '4.8',
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
                 ),
-                LText(review.content),
-                if (review.photos.isNotEmpty)
-                  SizedBox(
-                    height: 84,
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      children: [
-                        for (final photo in review.photos)
-                          GestureDetector(
-                            onTap: () => showDialog<void>(
-                              context: context,
-                              builder: (context) => Dialog(
-                                child: Stack(
-                                  children: [
-                                    InteractiveViewer(
-                                      child: Image.memory(base64Decode(photo)),
-                                    ),
-                                    Positioned(
-                                      right: 0,
-                                      child: IconButton(
-                                        onPressed: () => Navigator.pop(context),
-                                        icon: const Icon(Icons.close),
+                SizedBox(width: 5),
+                LText(
+                  '★★★★★',
+                  style: TextStyle(fontSize: 15, color: Color(0xFF455B77)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            for (final review in ownReviews)
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Expanded(child: LText('내 리뷰')),
+                          TextButton(
+                            onPressed: () => _editReview(review),
+                            child: const LText('수정'),
+                          ),
+                          TextButton(
+                            onPressed: () => _deleteReview(review),
+                            child: const LText('삭제'),
+                          ),
+                        ],
+                      ),
+                      LText(
+                        '사이즈 · ${review.fitSize}   발볼 · ${review.fitWidth}   착화감 · ${review.fitComfort}',
+                      ),
+                      LText(review.content),
+                      if (review.photos.isNotEmpty)
+                        SizedBox(
+                          height: 84,
+                          child: ListView(
+                            scrollDirection: Axis.horizontal,
+                            children: [
+                              for (final photo in review.photos)
+                                GestureDetector(
+                                  onTap: () => showDialog<void>(
+                                    context: context,
+                                    builder: (context) => Dialog(
+                                      child: Stack(
+                                        children: [
+                                          InteractiveViewer(
+                                            child: Image.memory(
+                                              base64Decode(photo),
+                                            ),
+                                          ),
+                                          Positioned(
+                                            right: 0,
+                                            child: IconButton(
+                                              onPressed: () =>
+                                                  Navigator.pop(context),
+                                              icon: const Icon(Icons.close),
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                  ],
+                                  ),
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(right: 6),
+                                    child: Image.memory(
+                                      base64Decode(photo),
+                                      width: 80,
+                                      height: 80,
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
                                 ),
-                              ),
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.only(right: 6),
-                              child: Image.memory(
-                                base64Decode(photo),
-                                width: 80,
-                                height: 80,
-                                fit: BoxFit.cover,
-                              ),
-                            ),
+                            ],
                           ),
-                      ],
-                    ),
+                        ),
+                    ],
                   ),
-              ],
-            ),
-          ),
-        ),
-      for (final entry in [
-        (
-          '착화감이 가볍고 좋아요',
-          '김** · 260 구매 · 2026.09.21',
-          '정사이즈로 잘 맞고 오래 걸어도 발이 편했습니다.',
-        ),
-        (
-          '색상이 화면 그대로예요',
-          '이** · 250 구매 · 2026.09.18',
-          '사진과 실제 색상이 비슷해서 코디하기 좋습니다.',
-        ),
-      ]) ...[
-        const Divider(height: 1),
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              LText(
-                entry.$1,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
                 ),
               ),
-              const SizedBox(height: 6),
-              LText(
-                entry.$2,
-                style: const TextStyle(fontSize: 12, color: Colors.grey),
+            for (final entry in [
+              (
+                '착화감이 가볍고 좋아요',
+                '김** · 260 구매 · 2026.09.21',
+                '정사이즈로 잘 맞고 오래 걸어도 발이 편했습니다.',
               ),
-              const SizedBox(height: 7),
-              LText(entry.$3, style: const TextStyle(fontSize: 14)),
+              (
+                '색상이 화면 그대로예요',
+                '이** · 250 구매 · 2026.09.18',
+                '사진과 실제 색상이 비슷해서 코디하기 좋습니다.',
+              ),
+            ]) ...[
+              const Divider(height: 1),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    LText(
+                      entry.$1,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    LText(
+                      entry.$2,
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 7),
+                    LText(entry.$3, style: const TextStyle(fontSize: 14)),
+                  ],
+                ),
+              ),
             ],
-          ),
-        ),
-      ],
-    ],
-  );
+          ],
+        );
 
   Widget _fitMetric(
     String label,
@@ -826,6 +943,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         onSaved: () => widget.onMessage('리뷰가 수정되었어요.'),
       ),
     );
+    if (mounted) await loadPublicReviews();
   }
 
   Future<void> _deleteReview(ProductReview review) async {
@@ -847,8 +965,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       ),
     );
     if (yes == true) {
-      await widget.store.deleteReview(review);
-      widget.onMessage('리뷰가 삭제되었어요.');
+      try {
+        await widget.store.deleteReview(review);
+        widget.onMessage('리뷰가 삭제되었어요.');
+        if (mounted) await loadPublicReviews();
+      } catch (error) {
+        widget.onMessage('리뷰 삭제 실패: $error');
+      }
     }
   }
 }
@@ -877,16 +1000,47 @@ class ProductOptionsSheet extends StatefulWidget {
 class _ProductOptionsSheetState extends State<ProductOptionsSheet> {
   String? selectedColor;
   final List<CartItem> selected = [];
+  List<ProductOption> options = [];
+  bool optionsLoading = true;
+  String? optionsError;
   String? error;
 
   String get color => selectedColor ?? widget.initialColor;
   String _restockKey(String size) => '${widget.product.id}:$color:$size';
-  List<String> get restockable => color == '블랙'
-      ? ['260']
-      : color == '베이지'
-      ? ['240']
-      : ['250'];
-  List<String> get unavailable => color == '베이지' ? ['270'] : ['280'];
+  List<String> get availableColors => options.isEmpty
+      ? widget.product.colors
+      : options.map((option) => option.color).toSet().toList();
+  List<ProductOption> get colorOptions =>
+      options.where((option) => option.color == color).toList();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadOptions();
+  }
+
+  /// 옵션은 화면을 열 때마다 서버에서 조회해 오래된 재고 선택을 막습니다.
+  Future<void> _loadOptions() async {
+    if (mounted) {
+      setState(() {
+        optionsLoading = true;
+        optionsError = null;
+      });
+    }
+    try {
+      final loaded = await widget.store.getProductOptions(widget.product.id);
+      if (!mounted) return;
+      setState(() {
+        options = loaded;
+        if (!availableColors.contains(color)) selectedColor = null;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => optionsError = '상품 옵션을 불러오지 못했어요.');
+    } finally {
+      if (mounted) setState(() => optionsLoading = false);
+    }
+  }
 
   void addOption(String size) {
     final key = '${widget.product.id}-$size-$color';
@@ -1019,7 +1173,7 @@ class _ProductOptionsSheetState extends State<ProductOptionsSheet> {
             Wrap(
               spacing: 6,
               children: [
-                for (final value in widget.product.colors)
+                for (final value in availableColors)
                   OutlinedButton(
                     onPressed: () => setState(() {
                       selectedColor = value;
@@ -1078,54 +1232,73 @@ class _ProductOptionsSheetState extends State<ProductOptionsSheet> {
               spacing: 8,
               runSpacing: 8,
               children: [
-                for (final size in ['240', '250', '260', '270', '280'])
-                  SizedBox(
-                    width: (MediaQuery.sizeOf(context).width - 56) / 3,
-                    child: OutlinedButton(
-                      onPressed:
-                          selectedColor == null || unavailable.contains(size)
-                          ? null
-                          : () async {
-                              if (restockable.contains(size)) {
-                                await widget.store.toggleRestock(
-                                  _restockKey(size),
-                                );
+                if (optionsLoading)
+                  const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: CircularProgressIndicator(),
+                  )
+                else if (optionsError != null)
+                  TextButton(
+                    onPressed: _loadOptions,
+                    child: const LText('옵션 조회 실패 · 다시 시도'),
+                  )
+                else if (colorOptions.isEmpty)
+                  const LText('선택한 색상의 판매 옵션이 없어요.')
+                else
+                  for (final option in colorOptions)
+                    SizedBox(
+                      width: (MediaQuery.sizeOf(context).width - 56) / 3,
+                      child: OutlinedButton(
+                        onPressed: selectedColor == null
+                            ? null
+                            : () async {
+                                if (option.isAvailable) {
+                                  addOption(option.size);
+                                  return;
+                                }
+                                try {
+                                  await widget.store.toggleRestock(
+                                    _restockKey(option.size),
+                                  );
+                                } catch (_) {
+                                  if (mounted) {
+                                    widget.onMessage(
+                                      '재입고 신청에 실패했습니다. 로그인과 연결 상태를 확인해주세요.',
+                                    );
+                                  }
+                                  return;
+                                }
                                 widget.onMessage(
                                   widget.store.restockKeys.contains(
-                                        _restockKey(size),
+                                        _restockKey(option.size),
                                       )
                                       ? '재입고 알림 신청을 저장했어요.'
                                       : '재입고 알림 신청을 취소했어요.',
                                 );
                                 if (mounted) setState(() {});
-                              } else {
-                                addOption(size);
-                              }
-                            },
-                      style: OutlinedButton.styleFrom(
-                        padding: EdgeInsets.zero,
-                        minimumSize: const Size(0, 62),
-                        side: const BorderSide(color: Color(0xFFE8E8E8)),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                              },
+                        style: OutlinedButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          minimumSize: const Size(0, 62),
+                          side: const BorderSide(color: Color(0xFFE8E8E8)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: LText(
+                          option.isAvailable
+                              ? '${option.size}\n재고 ${option.availableQuantity}'
+                              : '${option.size}\n${widget.store.restockKeys.contains(_restockKey(option.size)) ? '알림 신청됨' : '재입고 알림'}',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 12),
                         ),
                       ),
-                      child: LText(
-                        restockable.contains(size)
-                            ? '$size\n재입고 알림'
-                            : unavailable.contains(size)
-                            ? '$size\n품절'
-                            : size,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(fontSize: 12),
-                      ),
                     ),
-                  ),
               ],
             ),
             const SizedBox(height: 10),
             const LText(
-              '색상에 따라 재고·재입고 여부가 달라져요.',
+              '선택한 색상에 따라 실제 사이즈별 재고가 표시됩니다.',
               style: TextStyle(fontSize: 12, color: Colors.grey),
             ),
             const SizedBox(height: 20),

@@ -13,7 +13,10 @@ const _images = [
 final mockHeroImage = _images[5];
 
 /// Higgsfield 상품 목업을 앱 실행 중 조회할 수 있게 제공합니다.
-class MockProductRepository implements ProductRepository {
+class MockProductRepository implements ProductRepository, CatalogRepository {
+  @override
+  Future<CatalogMetadata> getCatalog() async =>
+      const CatalogMetadata(categories: categoryTree, brands: {});
   static const _baseCategories = <int, (String, String)>{
     1: ('스니커즈', '캔버스/단화'),
     2: ('구두', '더비/레이스업'),
@@ -178,6 +181,26 @@ class MockProductRepository implements ProductRepository {
   @override
   Future<List<Product>> getProducts() async =>
       List.unmodifiable([..._products, ..._generatedProducts()]);
+
+  @override
+  Future<List<ProductOption>> getProductOptions(int productId) async {
+    final product = [
+      ..._products,
+      ..._generatedProducts(),
+    ].firstWhere((item) => item.id == productId);
+    return [
+      for (final color in product.colors)
+        for (final size in ['250', '260', '270'])
+          ProductOption(
+            productVariantId: product.id * 1000 + int.parse(size),
+            productCode: 'MOCK-${product.id}-$color-$size',
+            color: color,
+            size: size,
+            availableQuantity: 10,
+            inventoryStatus: 'AVAILABLE',
+          ),
+    ];
+  }
 }
 
 /// 비밀번호를 영구 저장하지 않는 화면 확인용 계정입니다.
@@ -228,6 +251,19 @@ class MockOrderRepository implements OrderRepository {
       district: '성동구',
     ),
   ];
+
+  @override
+  Future<List<PickupBranch>> getPickupBranches() async => const [
+    PickupBranch(
+      id: 1,
+      code: 'SEL-SD',
+      name: 'SHUPICK 성동점',
+      districtCode: 'SEOUL-SEONGDONG',
+      districtName: '성동구',
+      address: '서울특별시 성동구 테스트로 10',
+      phone: '02-0000-0001',
+    ),
+  ];
   @override
   Future<List<StoreOrder>> getOrders() async => List.unmodifiable(_orders);
   @override
@@ -237,6 +273,8 @@ class MockOrderRepository implements OrderRepository {
     required int paidTotal,
     required int couponDiscount,
     required int pointsUsed,
+    required String paymentMethod,
+    int? customerCouponId,
   }) async {
     final order = StoreOrder(
       number: 'SS${DateTime.now().millisecondsSinceEpoch}',
@@ -326,8 +364,9 @@ class MockSupportRepository implements SupportRepository {
   Future<InquiryEntry> createInquiry(
     String kind,
     String title,
-    String body,
-  ) async {
+    String body, {
+    int? productId,
+  }) async {
     final entry = InquiryEntry(
       id: DateTime.now().microsecondsSinceEpoch,
       kind: kind,

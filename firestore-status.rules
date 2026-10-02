@@ -1,0 +1,21 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /orderStatuses/{id} {
+      allow read: if request.auth != null && resource.data.customerUid == request.auth.uid;
+      allow write: if false;
+    }
+    match /fulfillmentStatuses/{id} {
+      allow read: if request.auth != null && resource.data.customerUid == request.auth.uid;
+      allow write: if false;
+    }
+    match /pickupStatuses/{id} {
+      allow read: if request.auth != null && resource.data.customerUid == request.auth.uid;
+      allow write: if false;
+    }
+    match /inventoryStatuses/{id} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+  }
+}

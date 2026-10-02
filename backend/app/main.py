@@ -4,21 +4,41 @@ from fastapi import FastAPI, HTTPException
 from pymysql import MySQLError
 
 from .auth import router as auth_router
+from .branches import router as branches_router
+from .checkout_benefits import router as benefits_router
 from .database import mysql_connection
 from .orders import router as orders_router
+from .order_queries import router as order_queries_router
 from .outbox import router as outbox_router
 from .points import router as points_router
 from .procurement import audit_router, router as procurement_router
 from .products import router as products_router
 from .refunds import router as refunds_router
+from .returns import router as returns_router
+from .reviews import router as reviews_router
+from .interactions import router as interactions_router
+from .support import router as support_router
+from .catalog import router as catalog_router
+from .account_benefits import router as account_benefits_router
+from .pickup_tracking import router as pickup_router
 from .status_history import router as status_history_router
 
 
 app = FastAPI(title="Shupick API", version="0.1.0")
 app.include_router(auth_router)
+app.include_router(branches_router)
+app.include_router(benefits_router)
 app.include_router(products_router)
 app.include_router(refunds_router)
+app.include_router(returns_router)
+app.include_router(reviews_router)
+app.include_router(interactions_router)
+app.include_router(support_router)
+app.include_router(catalog_router)
+app.include_router(account_benefits_router)
+app.include_router(pickup_router)
 app.include_router(orders_router)
+app.include_router(order_queries_router)
 app.include_router(status_history_router)
 app.include_router(outbox_router)
 app.include_router(points_router)

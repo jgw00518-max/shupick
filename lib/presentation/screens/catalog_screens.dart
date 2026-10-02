@@ -6,7 +6,6 @@ import '../../data/mock_repositories.dart';
 import '../../domain/models.dart';
 import '../shared/store_widgets.dart';
 
-const searchCategories = ['전체', '운동화', '구두', '로퍼', '부츠', '샌들', '슬리퍼'];
 const campaignData = <String, ({String subtitle, List<int> ids})>{
   '이번 주 특가': (subtitle: '가볍게 시작하는 쇼핑', ids: [5, 6, 14, 19]),
   '매일 신는 좋은 신발': (subtitle: '일상에 자연스럽게 어울리는 선택', ids: [1, 9, 10, 16]),
@@ -183,15 +182,18 @@ class HomeScreen extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(18, 16, 10, 0),
           child: Row(
             children: [
-              for (final id in entry.value.ids.take(2))
+              for (final product in _campaignProducts(
+                store,
+                entry.value.ids,
+                limit: 2,
+              ))
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.only(right: 8),
                     child: ProductCard(
-                      product: store.products.firstWhere((p) => p.id == id),
+                      product: product,
                       store: store,
-                      onOpen: () =>
-                          onOpen(store.products.firstWhere((p) => p.id == id)),
+                      onOpen: () => onOpen(product),
                     ),
                   ),
                 ),
@@ -203,8 +205,24 @@ class HomeScreen extends StatelessWidget {
   );
 }
 
-String _campaignImage(StoreController store, int id) =>
-    store.products.firstWhere((product) => product.id == id).imageUrl;
+String _campaignImage(StoreController store, int id) {
+  for (final product in store.products) {
+    if (product.id == id) return product.imageUrl;
+  }
+  return store.products.isEmpty ? mockHeroImage : store.products.first.imageUrl;
+}
+
+/// 목업 기획전 ID가 실제 DB에 없으면 현재 상품 중 일부를 안전하게 대체 표시합니다.
+List<Product> _campaignProducts(
+  StoreController store,
+  List<int> ids, {
+  required int limit,
+}) {
+  final byId = {for (final product in store.products) product.id: product};
+  final matched = ids.map((id) => byId[id]).whereType<Product>().take(limit);
+  if (matched.isNotEmpty) return matched.toList();
+  return store.products.take(limit).toList();
+}
 
 /// 원본의 성별·중분류·하위 분류·다섯 가지 정렬을 적용합니다.
 class CatalogScreen extends StatefulWidget {
@@ -279,7 +297,8 @@ class _CatalogScreenState extends State<CatalogScreen> {
             children: [
               for (final value in [
                 '전체',
-                ...MockProductRepository.categoryTree[widget.initialMiddle]!,
+                ...widget.store.categoryTree[widget.initialMiddle] ??
+                    const <String>[],
               ])
                 Padding(
                   padding: const EdgeInsets.only(right: 8),
@@ -522,6 +541,7 @@ class _SearchScreenState extends State<SearchScreen> {
   String query = '';
   String category = '전체';
   String? selectedGender;
+  String? selectedBrand;
 
   @override
   Widget build(BuildContext context) {
@@ -529,7 +549,10 @@ class _SearchScreenState extends State<SearchScreen> {
         .where(
           (item) =>
               (selectedGender == null || item.gender == selectedGender) &&
-              (category == '전체' || item.category == category) &&
+              (category == '전체' || item.middleCategory == category) &&
+              (selectedBrand == null ||
+                  (widget.store.brands[selectedBrand]?.contains(item.id) ??
+                      false)) &&
               (item.name.toLowerCase().contains(query.toLowerCase()) ||
                   item.category.contains(query)),
         )
@@ -541,6 +564,21 @@ class _SearchScreenState extends State<SearchScreen> {
           padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
           child: SectionTitle('신발 찾기'),
         ),
+        if (widget.store.brands.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: DropdownButtonFormField<String>(
+              initialValue: selectedBrand ?? '',
+              decoration: const InputDecoration(labelText: '브랜드'),
+              items: [
+                const DropdownMenuItem(value: '', child: LText('전체 브랜드')),
+                for (final brand in widget.store.brands.keys)
+                  DropdownMenuItem(value: brand, child: LText(brand)),
+              ],
+              onChanged: (value) =>
+                  setState(() => selectedBrand = value == '' ? null : value),
+            ),
+          ),
         const Padding(
           padding: EdgeInsets.symmetric(horizontal: 16),
           child: LText('스타일과 용도에 맞는 한 켤레를 골라보세요.'),
@@ -563,7 +601,7 @@ class _SearchScreenState extends State<SearchScreen> {
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 12),
             children: [
-              for (final value in searchCategories)
+              for (final value in ['전체', ...widget.store.categoryTree.keys])
                 Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: TextButton(
