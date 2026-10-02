@@ -234,7 +234,7 @@ class _StoreShellState extends State<StoreShell> {
                 ? MediaQuery(
                     data: MediaQuery.of(
                       context,
-                    ).copyWith(textScaler: const TextScaler.linear(1.3)),
+                    ).copyWith(textScaler: const TextScaler.linear(1.16)),
                     child: _body(),
                   )
                 : _body(),
@@ -245,8 +245,8 @@ class _StoreShellState extends State<StoreShell> {
                     backgroundColor: dark ? null : Colors.white,
                     selectedItemColor: brandBlue,
                     unselectedItemColor: const Color(0xFF888888),
-                    selectedFontSize: 12,
-                    unselectedFontSize: 12,
+                    selectedFontSize: 11,
+                    unselectedFontSize: 11,
                     iconSize: 25,
                     elevation: 4,
                     currentIndex: switch (page) {

@@ -318,7 +318,13 @@ class _CartScreenState extends State<CartScreen> {
                     ),
                   ],
                 ),
-                const LText('쿠폰과 적립금은 다음 결제 단계에서 적용할 수 있어요.'),
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: LText(
+                    '쿠폰·적립금은 결제 단계에서 사용하세요.',
+                    style: TextStyle(fontSize: 13, color: Color(0xFF777777)),
+                  ),
+                ),
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton(
