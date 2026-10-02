@@ -83,33 +83,58 @@ class HomeScreen extends StatelessWidget {
         padding: EdgeInsets.fromLTRB(16, 22, 16, 12),
         child: SectionTitle('기획전'),
       ),
-      SizedBox(
-        height: 150,
-        child: ListView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             for (final entry in campaignData.entries)
-              InkWell(
-                onTap: () => onCampaign(entry.key),
-                child: SizedBox(
-                  width: 170,
-                  child: Card(
-                    child: Column(
-                      children: [
-                        Expanded(
-                          child: Image.network(
-                            _campaignImage(store, entry.value.ids.first),
-                            fit: BoxFit.cover,
-                            width: double.infinity,
-                            errorBuilder: (_, _, _) => const SizedBox(),
+              Expanded(
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: () => onCampaign(entry.key),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 6,
+                      ),
+                      child: Column(
+                        children: [
+                          Container(
+                            width: 88,
+                            height: 88,
+                            clipBehavior: Clip.antiAlias,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.surfaceContainerHighest,
+                            ),
+                            child: Image.network(
+                              _campaignImage(store, entry.value.ids.first),
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, _, _) => const Icon(
+                                Icons.image_outlined,
+                                color: Colors.grey,
+                              ),
+                            ),
                           ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.all(8),
-                          child: LText(entry.key),
-                        ),
-                      ],
+                          const SizedBox(height: 10),
+                          LText(
+                            entry.key,
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              height: 1.35,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -440,17 +465,21 @@ class SearchScreen extends StatefulWidget {
 class _SearchScreenState extends State<SearchScreen> {
   String query = '';
   String category = '전체';
+  String? selectedGender;
+
   @override
   Widget build(BuildContext context) {
     final results = widget.store.products
         .where(
           (item) =>
+              (selectedGender == null || item.gender == selectedGender) &&
               (category == '전체' || item.category == category) &&
               (item.name.toLowerCase().contains(query.toLowerCase()) ||
                   item.category.contains(query)),
         )
         .toList();
-    return Column(
+    final colorScheme = Theme.of(context).colorScheme;
+    final content = Column(
       children: [
         const Padding(
           padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -509,6 +538,67 @@ class _SearchScreenState extends State<SearchScreen> {
                   store: widget.store,
                   onOpen: widget.onOpen,
                 ),
+        ),
+      ],
+    );
+    return Stack(
+      children: [
+        content,
+        Positioned(
+          left: 16,
+          right: 16,
+          bottom: 16,
+          child: Center(
+            child: Material(
+              color: colorScheme.surface,
+              elevation: 12,
+              shadowColor: Colors.black45,
+              shape: StadiumBorder(
+                side: BorderSide(color: colorScheme.outlineVariant),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Padding(
+                padding: const EdgeInsets.all(4),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    for (final gender in const ['공용', '남성', '여성'])
+                      InkWell(
+                        borderRadius: BorderRadius.circular(28),
+                        onTap: () => setState(
+                          () => selectedGender = selectedGender == gender
+                              ? null
+                              : gender,
+                        ),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          curve: Curves.easeOut,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 18,
+                            vertical: 11,
+                          ),
+                          decoration: BoxDecoration(
+                            color: selectedGender == gender
+                                ? colorScheme.primary
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(28),
+                          ),
+                          child: LText(
+                            gender,
+                            style: TextStyle(
+                              color: selectedGender == gender
+                                  ? colorScheme.onPrimary
+                                  : colorScheme.onSurface,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
         ),
       ],
     );
