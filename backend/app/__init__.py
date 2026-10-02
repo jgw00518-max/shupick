@@ -1,0 +1,1 @@
+"""Shupick FastAPI backend package."""
