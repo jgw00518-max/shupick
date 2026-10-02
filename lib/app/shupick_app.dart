@@ -6,13 +6,15 @@ import 'store_binding.dart';
 
 /// 앱 진입점은 의존성 조립과 공통 테마만 담당합니다.
 class ShupickApp extends StatelessWidget {
-  const ShupickApp({super.key});
+  const ShupickApp({super.key, this.binding});
+
+  final Bindings? binding;
 
   @override
   Widget build(BuildContext context) => GetMaterialApp(
     title: 'SHUPICK',
     debugShowCheckedModeBanner: false,
-    initialBinding: StoreBinding(),
+    initialBinding: binding ?? StoreBinding(),
     theme: ThemeData(
       useMaterial3: true,
       scaffoldBackgroundColor: const Color(0xFFF7F6F3),

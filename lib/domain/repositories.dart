@@ -1,5 +1,15 @@
 import 'models.dart';
 
+/// Device-wide UI preferences, independent of account sign-in.
+abstract interface class SettingsRepository {
+  Future<String> language();
+  Future<bool> dark();
+  Future<bool> push();
+  Future<void> saveLanguage(String value);
+  Future<void> saveDark(bool value);
+  Future<void> savePush(bool value);
+}
+
 /// 실제 연동 시 API 기반 구현으로 교체하는 상품 조회 경계입니다.
 abstract interface class ProductRepository {
   Future<List<Product>> getProducts();
@@ -40,7 +50,7 @@ abstract interface class ReviewRepository {
 
 /// 추후 장바구니·찜·최근 본 기록의 API/SQLite 구현으로 교체합니다.
 abstract interface class ShoppingRepository {
-  Future<ShoppingSnapshot> load();
+  Future<ShoppingSnapshot> load(List<Product> products);
   Future<void> save(ShoppingSnapshot snapshot);
 }
 

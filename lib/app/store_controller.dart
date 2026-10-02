@@ -26,7 +26,7 @@ class StoreController extends GetxController {
   List<StoreOrder> orders = [];
   final List<ProductReview> reviews = [];
   final List<CartItem> cart = [];
-  final Set<int> wishedIds = {2};
+  final Set<int> wishedIds = {};
   final List<int> recentIds = [];
   final List<InquiryEntry> inquiries = [];
   final Set<String> restockKeys = {};
@@ -62,7 +62,7 @@ class StoreController extends GetxController {
       reviews
         ..clear()
         ..addAll(await reviewRepository.getReviews());
-      final shopping = await shoppingRepository.load();
+      final shopping = await shoppingRepository.load(products);
       cart
         ..clear()
         ..addAll(shopping.cart);

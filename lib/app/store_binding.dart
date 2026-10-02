@@ -1,21 +1,53 @@
 import 'package:get/get.dart';
 
+import '../data/firebase_account_repository.dart';
+import '../data/local_database.dart';
+import '../data/local_settings_repository.dart';
 import '../data/local_support_repository.dart';
 import '../data/mock_repositories.dart';
+import '../data/sqlite_cached_product_repository.dart';
+import '../data/sqlite_shopping_repository.dart';
 import '../domain/repositories.dart';
 import 'store_controller.dart';
 import 'store_navigation_controller.dart';
-import '../data/firebase_account_repository.dart';
 
 /// 앱에서 사용하는 저장소와 GetX 컨트롤러의 생성 책임을 모읍니다.
 class StoreBinding extends Bindings {
+  StoreBinding({
+    this.productsRepository,
+    this.accountRepository,
+    this.shoppingRepository,
+    this.settingsRepository,
+  });
+
+  final ProductRepository? productsRepository;
+  final AccountRepository? accountRepository;
+  final ShoppingRepository? shoppingRepository;
+  final SettingsRepository? settingsRepository;
+
   @override
   void dependencies() {
-    Get.lazyPut<ProductRepository>(() => MockProductRepository());
-    Get.lazyPut<AccountRepository>(() => FirebaseAccountRepository());
+    Get.lazyPut<ProductRepository>(
+      () =>
+          productsRepository ??
+          SqliteCachedProductRepository(
+            LocalDatabase.instance,
+            MockProductRepository(),
+          ),
+    );
+    Get.lazyPut<AccountRepository>(
+      () => accountRepository ?? FirebaseAccountRepository(),
+    );
     Get.lazyPut<OrderRepository>(() => MockOrderRepository());
     Get.lazyPut<ReviewRepository>(() => MockReviewRepository());
-    Get.lazyPut<ShoppingRepository>(() => MockShoppingRepository());
+    Get.lazyPut<ShoppingRepository>(
+      () =>
+          shoppingRepository ??
+          SqliteShoppingRepository(LocalDatabase.instance),
+    );
+    Get.lazyPut<SettingsRepository>(
+      () => settingsRepository ?? LocalSettingsRepository(),
+    );
     Get.lazyPut<SupportRepository>(() => LocalSupportRepository());
     Get.put(StoreNavigationController());
     Get.put(

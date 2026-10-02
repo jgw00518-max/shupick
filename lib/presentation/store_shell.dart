@@ -7,7 +7,7 @@ import 'localization.dart';
 import '../app/store_controller.dart';
 import '../app/store_navigation_controller.dart';
 import '../data/mock_repositories.dart';
-import '../data/local_settings_repository.dart';
+import '../domain/repositories.dart';
 import '../domain/models.dart';
 import 'screens/account_screens.dart';
 import 'screens/catalog_screens.dart';
@@ -49,7 +49,7 @@ class _StoreShellState extends State<StoreShell> {
   final StoreController store = Get.find<StoreController>();
   final StoreNavigationController navigation =
       Get.find<StoreNavigationController>();
-  final settings = LocalSettingsRepository();
+  final SettingsRepository settings = Get.find<SettingsRepository>();
   Product? selected;
   String campaign = '이번 주 특가';
   String? catalogGender;
