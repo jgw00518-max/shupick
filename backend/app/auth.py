@@ -218,8 +218,8 @@ def sync_customer_profile(
                                 WHERE customer_id=%s
                                 """,
                                 (
-                                    identity.uid, request.customerName, request.phone,
-                                    request.birthDate, email_customer["customer_id"],
+                                    identity.uid, request.customerName, request.phone if 'phone' in request.model_fields_set else email_customer.get('phone'),
+                                    request.birthDate if 'birthDate' in request.model_fields_set else email_customer.get('birth_date'), email_customer["customer_id"],
                                 ),
                             )
                             customer_id = int(email_customer["customer_id"])
@@ -245,7 +245,7 @@ def sync_customer_profile(
                             SET email=%s,customer_name=%s,phone=%s,birth_date=%s,deleted_at=NULL
                             WHERE customer_id=%s
                             """,
-                            (identity.email, request.customerName, request.phone, request.birthDate, customer_id),
+                            (identity.email, request.customerName, request.phone if 'phone' in request.model_fields_set else customer.get('phone'), request.birthDate if 'birthDate' in request.model_fields_set else customer.get('birth_date'), customer_id),
                         )
                     cursor.execute("SELECT * FROM customers WHERE customer_id=%s", (customer_id,))
                     result = cursor.fetchone()

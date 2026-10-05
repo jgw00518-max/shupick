@@ -133,6 +133,7 @@ class _InquiryScreenState extends State<InquiryScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SectionTitle('1:1 문의'),
+            const SizedBox(height: 16),
             DropdownButtonFormField<String>(
               initialValue: kind,
               decoration: const InputDecoration(

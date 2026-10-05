@@ -213,7 +213,13 @@ class MockAccountRepository implements AccountRepository {
       _accounts[email] == password;
 
   @override
-  Future<void> signUp(String email, String password) async {
+  Future<void> signUp(
+    String email,
+    String password, {
+    String? name,
+    String? phone,
+    DateTime? birthDate,
+  }) async {
     if (_accounts.containsKey(email)) {
       throw StateError('이미 가입한 이메일입니다.');
     }
@@ -257,7 +263,7 @@ class MockOrderRepository implements OrderRepository {
     PickupBranch(
       id: 1,
       code: 'SEL-SD',
-      name: 'SHUPICK 성동점',
+      name: 'SHOEPICK 성동점',
       districtCode: 'SEOUL-SEONGDONG',
       districtName: '성동구',
       address: '서울특별시 성동구 테스트로 10',
@@ -346,7 +352,8 @@ class MockSupportRepository implements SupportRepository {
       title: '픽업 대리점 운영시간이 궁금해요',
       body: '퇴근 후 방문하려고 합니다. 평일 운영시간을 알려주세요.',
       date: '2026.09.20',
-      answer: 'SHUPICK 성동점은 평일 오전 10시 30분부터 오후 8시까지 운영합니다. 방문 시 주문 QR을 준비해주세요.',
+      answer:
+          'SHOEPICK 성동점은 평일 오전 10시 30분부터 오후 8시까지 운영합니다. 방문 시 주문 QR을 준비해주세요.',
     ),
     const InquiryEntry(
       id: 2,

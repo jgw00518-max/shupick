@@ -49,7 +49,7 @@ void main() {
   testWidgets('비회원 홈에서 상품과 마이페이지로 이동할 수 있다', (tester) async {
     SharedPreferences.setMockInitialValues({});
     await pumpReady(tester);
-    expect(find.text('SHUPICK'), findsOneWidget);
+    expect(find.text('SHOEPICK'), findsOneWidget);
     expect(find.text('기획전'), findsOneWidget);
     await tester.tap(find.byIcon(Icons.person_outline));
     await tester.pumpAndSettle();

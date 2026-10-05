@@ -14,7 +14,11 @@ class FirebaseAccountRepository implements AccountRepository {
   bool _googleInitialized = false;
 
   /// Firebase 계정을 MySQL 고객 프로필과 연결해 이후 주문 인증에 사용합니다.
-  Future<void> _syncCustomerProfile() async {
+  Future<void> _syncCustomerProfile({
+    String? customerName,
+    String? phone,
+    DateTime? birthDate,
+  }) async {
     final user = _auth.currentUser;
     final token = await user?.getIdToken();
     final email = user?.email;
@@ -28,9 +32,14 @@ class FirebaseAccountRepository implements AccountRepository {
         'Content-Type': 'application/json; charset=utf-8',
       },
       body: jsonEncode({
-        'customerName': user.displayName?.trim().isNotEmpty == true
-            ? user.displayName!.trim()
-            : email.split('@').first,
+        'customerName':
+            customerName ??
+            (user.displayName?.trim().isNotEmpty == true
+                ? user.displayName!.trim()
+                : email.split('@').first),
+        'phone': ?phone,
+        if (birthDate != null)
+          'birthDate': birthDate.toIso8601String().split('T').first,
       }),
     );
     if (response.statusCode != 200) {
@@ -62,13 +71,24 @@ class FirebaseAccountRepository implements AccountRepository {
   }
 
   @override
-  Future<void> signUp(String email, String password) async {
+  Future<void> signUp(
+    String email,
+    String password, {
+    String? name,
+    String? phone,
+    DateTime? birthDate,
+  }) async {
     try {
       await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
-      await _syncCustomerProfile();
+      if (name != null) await _auth.currentUser?.updateDisplayName(name.trim());
+      await _syncCustomerProfile(
+        customerName: name?.trim(),
+        phone: phone,
+        birthDate: birthDate,
+      );
     } on FirebaseAuthException catch (e) {
       if (e.code == 'email-already-in-use') {
         throw StateError('이미 가입한 이메일입니다.');

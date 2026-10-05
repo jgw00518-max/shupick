@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../app/store_controller.dart';
 import '../../domain/models.dart';
+import '../shared/app_theme.dart';
 
 /// 구매 항목의 리뷰, 착화감, 사진을 목업 저장소에 기록합니다.
 class ReviewSheet extends StatefulWidget {
@@ -182,8 +183,12 @@ class _ReviewSheetState extends State<ReviewSheet> {
                     tooltip: '$value점',
                     onPressed: () => setState(() => rating = value),
                     icon: Icon(
-                      value <= rating ? Icons.star : Icons.star_border,
-                      color: Colors.amber,
+                      value <= rating
+                          ? Icons.star_rounded
+                          : Icons.star_outline_rounded,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? const Color(0xFFE8B85E)
+                          : AppColors.rating,
                     ),
                   ),
               ],
@@ -280,7 +285,7 @@ class SectionLabel extends StatelessWidget {
     padding: const EdgeInsets.symmetric(vertical: 10),
     child: LText(
       text,
-      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
     ),
   );
 }

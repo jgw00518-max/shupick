@@ -56,7 +56,7 @@ void main() {
             {
               'branchId': 1,
               'branchCode': 'SEL-SD',
-              'branchName': 'SHUPICK 성동점',
+              'branchName': 'SHOEPICK 성동점',
               'districtCode': 'SEOUL-SEONGDONG',
               'districtName': '성동구',
               'address': '서울특별시 성동구 테스트로 10',

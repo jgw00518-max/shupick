@@ -1,4 +1,4 @@
-# SHUPICK — 고객 앱과 공통 백엔드
+# SHOEPICK — 고객 앱과 공통 백엔드
 
 신발을 주문하고 선택한 대리점에서 수령하는 Flutter 시연 프로젝트입니다. 고객 앱은 FastAPI를 통해 MySQL에 접근하며 SQLite는 기기 안의 설정과 쇼핑 기록을 저장합니다. 직원 앱에서도 사용할 수 있도록 공통 백엔드의 직원 인증·업무 API를 추가했습니다. 이 저장소의 `lib/`는 고객 앱이며 직원 앱 화면 전체가 이 저장소에 구현된 것은 아닙니다.
 
@@ -8,7 +8,7 @@
 
 ### 고객 화면과 로컬 저장
 
-- 앱 화면의 브랜드 문구를 SHUPICK으로 변경하고 [참고 목업](https://sole-select.higgsfield.app/)에 맞춰 상품 상세 화면을 구성했습니다.
+- 앱 화면의 브랜드 문구를 SHOEPICK으로 변경하고 [참고 목업](https://sole-select.higgsfield.app/)에 맞춰 상품 상세 화면을 구성했습니다.
 - 상품 목록·상세·구매 화면의 글자 크기를 조정해 가독성과 줄바꿈을 개선했습니다.
 - 비회원 상품 탐색, 성별·분류·브랜드 필터, 정렬, 검색, 최근 본 상품, 찜, 장바구니, 색상·사이즈·수량 선택을 구현했습니다.
 - SQLite로 언어·다크 모드·알림 설정, 장바구니·찜·최근 조회·검색 기록과 상품 캐시를 저장합니다.
@@ -121,6 +121,73 @@
 `@shupick_demo_apply` 기본값은 0입니다. 데이터 추가 승인 후에만 1로 변경하여 실행합니다. 실행 자체에는 로더 프로시저 생성·삭제가 포함됩니다. 업무 데이터는 한 트랜잭션으로 추가하며 오류 시 롤백하고, DEMO26/D26 데이터가 이미 있으면 중복 적용을 차단합니다. Firebase 계정 생성·직원 권한 변경·실제 결제 호출·알림 발송은 포함하지 않습니다.
 
 INSERT 35문장의 32개 업무 테이블 컬럼을 실제 DB 메타데이터와 대조했고, 상품·옵션·주문 구성도 정적으로 확인했습니다. 실제 INSERT 실행 검증은 적용 승인 후 진행합니다.
+
+### 임시 데이터 추가 절차 — MySQL Workbench
+
+아래 절차는 기존 스키마와 필요한 마이그레이션이 적용된 `shupick_v2`를 대상으로 합니다. 기존 스키마 파일을 다시 실행하지 않습니다.
+
+1. MySQL Workbench에서 백엔드가 사용하는 MySQL 서버에 연결하고 [임시 데이터 SQL](database/demo/shupick_demo_20261005.sql)을 엽니다. 로컬 경로는 `C:\0619ksh\Flutter\shupick\database\demo\shupick_demo_20261005.sql`입니다.
+2. 파일 위쪽의 실행 허용 값을 다음처럼 변경합니다.
+
+   ~~~sql
+   SET @shupick_demo_apply = 1;
+   ~~~
+
+3. 본인의 고객 앱 로그인으로 테스트 주문·문의·포인트를 확인하려면, 먼저 앱에서 로그인하여 고객 동기화를 완료합니다. 다음 조회에서 본인의 로그인 이메일을 지정하여 기존 고객 UID를 확인합니다.
+
+   ~~~sql
+   SELECT customer_id, customer_name, firebase_uid
+   FROM shupick_v2.customers
+   WHERE email = '본인의 로그인 이메일';
+   ~~~
+
+   확인한 UID를 SQL 파일의 설정에 넣습니다.
+
+   ~~~sql
+   SET @shupick_demo_customer_uid = '확인한 Firebase UID';
+   ~~~
+
+   가상 고객만 생성하려면 `SET @shupick_demo_customer_uid = NULL;`을 유지합니다. 가상 UID는 Firebase 로그인 계정이 아니므로 해당 고객으로 앱에 로그인할 수 없습니다. UID를 지정했는데 조회 결과가 없다면 고객 동기화를 먼저 확인합니다.
+
+4. `DELIMITER`부터 마지막 문장까지 파일 전체를 선택하고 Workbench의 선택한 SQL 실행 버튼(번개 아이콘)으로 실행합니다. CREATE/DROP PROCEDURE 권한이 필요합니다. 정상 완료 결과는 `DEMO26 committed`입니다. 정상 적용 후에는 다시 실행하지 않습니다. 오류가 발생하면 업무 데이터는 롤백되므로 전체 오류 문구를 확인한 뒤 원인을 해결합니다.
+5. 다음 SELECT로 추가 결과를 확인합니다.
+
+   ~~~sql
+   USE shupick_v2;
+
+   SELECT COUNT(*) AS demo_products
+   FROM products
+   WHERE model_code LIKE 'DEMO26-P%';
+
+   SELECT COUNT(*) AS demo_variants
+   FROM product_variants
+   WHERE product_code LIKE 'DEMO26-P%';
+
+   SELECT order_status, COUNT(*) AS order_count
+   FROM orders
+   WHERE order_number LIKE 'DEMO26-O%'
+   GROUP BY order_status;
+   ~~~
+
+   예상 결과는 상품 24개, 옵션 240개입니다.
+
+   | 주문 상태 | 예상 건수 |
+   | --- | ---: |
+   | PREPARING | 6 |
+   | SHIPPING | 6 |
+   | READY_FOR_PICKUP | 6 |
+   | COMPLETED | 18 |
+
+6. 백엔드를 실행해 둔 상태에서 Android 에뮬레이터의 고객 앱을 종료하고 다시 실행합니다.
+
+   ~~~powershell
+   cd C:\0619ksh\Flutter\shupick
+   flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000
+   ~~~
+
+   직원용 앱도 같은 백엔드에 연결하면 기존 직원 권한과 현재 대리점 배정에 따라 테스트 업무 데이터를 조회할 수 있습니다.
+
+기본 실행 허용 값 0에서는 업무 데이터가 추가되지 않습니다. 파일 실행 시 로더 프로시저의 생성·삭제는 발생하며, 오류로 로더가 남은 경우 정리 방법은 [데모 데이터 설명](database/demo/README.md)을 참고하세요.
 
 ## Windows PowerShell 실행
 

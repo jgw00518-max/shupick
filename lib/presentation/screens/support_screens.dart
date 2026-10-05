@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../localization.dart';
-import 'package:flutter/services.dart';
+import '../shared/shipping_tracking_content.dart';
 
 import '../../app/store_controller.dart';
 import '../../data/api_order_repository.dart';
@@ -84,79 +84,65 @@ class _ShippingScreenState extends State<ShippingScreen> {
     }
   }
 
-  String _status(String value) => switch (value) {
-    'PENDING_PAYMENT' => '결제 대기',
-    'PAID' => '결제 완료',
-    'PREPARING' => '상품 준비',
-    'SHIPPING' => '대리점 이동 중',
-    'READY_FOR_PICKUP' => '픽업 가능',
-    'COMPLETED' => '수령 완료',
-    'CANCELED' => '취소 완료',
-    'REFUNDED' => '환불 완료',
-    _ => value,
-  };
-
   @override
   Widget build(BuildContext context) {
     if (widget.order == null) return const EmptyState('조회할 주문이 없습니다.');
     final data = tracking;
-    return ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
-        const SectionTitle('픽업 배송 조회'),
-        TextButton(
-          onPressed: loading ? null : _load,
-          child: const LText('새로고침'),
-        ),
-        if (loading) const LinearProgressIndicator(),
-        if (error != null) LText(error!),
-        if (realtimeError != null)
-          const LText('실시간 연결을 확인해주세요. 새로고침으로 조회할 수 있습니다.'),
-        if (data != null) ...[
-          LText(
-            _status(data['order_status'] as String),
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-          ),
-          LText('주문 번호 ${data['order_number']}'),
-          Card(
-            child: ListTile(
-              title: LText('${data['branch_name']}'),
-              subtitle: LText('${data['address']}\n${data['phone']}'),
-            ),
-          ),
-          for (final hour in data['businessHours'] as List)
-            LText(
-              '${const ['월', '화', '수', '목', '금', '토', '일'][(hour['day_of_week'] as int) - 1]}요일 · ${hour['is_closed'] == 1 || hour['is_closed'] == true ? '휴무' : '${hour['opens_at']} ~ ${hour['closes_at']}'}',
-            ),
-          if (data['tracking_number'] != null)
-            LText('운송장 번호 ${data['tracking_number']}'),
-          if (data['arrived_at'] != null) LText('대리점 도착 ${data['arrived_at']}'),
-          if (data['pickup_deadline_at'] != null)
-            LText('픽업 기한 ${data['pickup_deadline_at']}'),
-          if (data['order_status'] == 'READY_FOR_PICKUP') ...[
-            const LText('수령 시 아래 결제 코드를 직원에게 보여주세요.'),
-            SelectableText(data['order_number'] as String),
-            TextButton(
-              onPressed: () => Clipboard.setData(
-                ClipboardData(text: data['order_number'] as String),
+    final theme = Theme.of(context);
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(20),
+        children: [
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 12,
+            runSpacing: 4,
+            children: [
+              LText('픽업 배송 조회', style: theme.textTheme.headlineSmall),
+              TextButton.icon(
+                onPressed: loading ? null : _load,
+                icon: const Icon(Icons.refresh, size: 20),
+                label: const LText('새로고침'),
               ),
-              child: const LText('코드 복사'),
-            ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          if (loading) ...[
+            const LinearProgressIndicator(),
+            const SizedBox(height: 20),
           ],
-          if (data['picked_up_at'] != null)
-            LText('수령 완료 ${data['picked_up_at']}'),
-          const SectionTitle('상태 변경 이력'),
-          for (final entry in data['history'] as List)
-            ListTile(
-              title: LText(_status(entry['new_status'] as String)),
-              subtitle: LText('${entry['changed_at']}'),
+          if (error != null || realtimeError != null) ...[
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.errorContainer,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: LText(
+                error ?? '실시간 연결을 확인해주세요. 새로고침으로 조회할 수 있습니다.',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onErrorContainer,
+                ),
+              ),
             ),
+            const SizedBox(height: 20),
+          ],
+          if (data != null)
+            ShippingTrackingContent(
+              data: data,
+              purchaseConfirmed: widget.order!.purchaseConfirmed,
+            ),
+          OutlinedButton.icon(
+            onPressed: widget.onOrders,
+            icon: const Icon(Icons.receipt_long_outlined, size: 20),
+            label: const LText('주문 내역으로 돌아가기'),
+          ),
+          const SizedBox(height: 12),
         ],
-        OutlinedButton(
-          onPressed: widget.onOrders,
-          child: const LText('주문 내역으로 돌아가기'),
-        ),
-      ],
+      ),
     );
   }
 }
@@ -244,7 +230,7 @@ class _BenefitsViewState extends State<_BenefitsView> {
         if (!widget.coupons && data != null) ...[
           LText(
             '사용 가능 적립금 ${wallet?['balance'] ?? 0}P',
-            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
           ),
           const LText('포인트는 각 적립일을 기준으로 1년 후 만료됩니다.'),
           const SectionTitle('만료 예정 포인트'),

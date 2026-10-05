@@ -6,6 +6,7 @@ import '../localization.dart';
 import '../../app/store_controller.dart';
 import '../../domain/models.dart';
 import '../shared/store_widgets.dart';
+import '../shared/rating_stars.dart';
 import 'review_sheet.dart';
 import '../../data/api_review_repository.dart';
 import 'public_reviews.dart';
@@ -90,6 +91,108 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     }
   }
 
+  List<ProductOption> productOptions = [];
+  bool productOptionsLoading = true;
+  bool productOptionsFailed = false;
+  int productOptionsRequest = 0;
+
+  Future<void> loadProductOptions() async {
+    final token = ++productOptionsRequest;
+    setState(() {
+      productOptionsLoading = true;
+      productOptionsFailed = false;
+    });
+    try {
+      final result = await widget.store.getProductOptions(widget.product.id);
+      if (!mounted || token != productOptionsRequest) return;
+      setState(() {
+        productOptions = result;
+        final colors = result.map((option) => option.color).toSet();
+        if (colors.isNotEmpty && !colors.contains(color)) color = colors.first;
+      });
+    } catch (_) {
+      if (mounted && token == productOptionsRequest) {
+        setState(() => productOptionsFailed = true);
+      }
+    } finally {
+      if (mounted && token == productOptionsRequest) {
+        setState(() => productOptionsLoading = false);
+      }
+    }
+  }
+
+  @override
+  void didUpdateWidget(ProductDetailScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.product.id != widget.product.id) {
+      color = widget.product.color;
+      productOptions = [];
+      loadProductOptions();
+    }
+  }
+
+  Widget sizeAvailability() {
+    if (productOptionsLoading) return const LinearProgressIndicator();
+    if (productOptionsFailed) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const LText('상품 옵션을 불러오지 못했어요.'),
+          TextButton.icon(
+            onPressed: loadProductOptions,
+            icon: const Icon(Icons.refresh),
+            label: const LText('다시 시도'),
+          ),
+        ],
+      );
+    }
+    final sizes =
+        productOptions
+            .where((option) => option.color == color)
+            .map((option) => option.size)
+            .toSet()
+            .toList()
+          ..sort(
+            (a, b) => (int.tryParse(a) ?? 0).compareTo(int.tryParse(b) ?? 0),
+          );
+    if (sizes.isEmpty) return const LText('현재 판매 가능한 옵션이 없습니다.');
+    final scheme = Theme.of(context).colorScheme;
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        for (final size in sizes)
+          Container(
+            constraints: const BoxConstraints(minWidth: 64),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: scheme.surface,
+              border: Border.all(color: scheme.outlineVariant),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                LText(size, style: Theme.of(context).textTheme.bodyMedium),
+                if (!productOptions.any(
+                  (option) =>
+                      option.color == color &&
+                      option.size == size &&
+                      option.isAvailable,
+                ))
+                  LText(
+                    '품절',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
   String get reviewSummary =>
       widget.store.reviewRepository is ApiReviewRepository
       ? reviewsError != null
@@ -102,6 +205,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   void initState() {
     super.initState();
     color = widget.product.color;
+    loadProductOptions();
     loadPublicReviews();
   }
 
@@ -147,9 +251,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
       ),
       builder: (sheetContext) => MediaQuery(
-        data: MediaQuery.of(
-          sheetContext,
-        ).copyWith(textScaler: const TextScaler.linear(1.16)),
+        data: MediaQuery.of(sheetContext),
         child: ProductOptionsSheet(
           product: widget.product,
           store: widget.store,
@@ -171,7 +273,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         .where((r) => r.itemKey.startsWith('${widget.product.id}-'))
         .toList();
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final muted = isDark ? Colors.white70 : const Color(0xFF777777);
+    final muted = isDark ? Colors.white70 : const Color(0xFF5F6975);
     final surface = isDark
         ? Theme.of(context).colorScheme.surface
         : Colors.white;
@@ -221,7 +323,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           color,
                           style: const TextStyle(
                             color: Colors.black87,
-                            fontSize: 13,
+                            fontSize: 15,
                           ),
                         ),
                       ),
@@ -236,25 +338,25 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   children: [
                     LText(
                       widget.product.category,
-                      style: TextStyle(fontSize: 14, color: muted),
+                      style: TextStyle(fontSize: 16, color: muted),
                     ),
                     const SizedBox(height: 10),
                     LText(
                       widget.product.name,
                       style: const TextStyle(
-                        fontSize: 26,
+                        fontSize: 28,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
                     const SizedBox(height: 8),
                     LText(
                       won(widget.product.price),
-                      style: const TextStyle(fontSize: 20),
+                      style: const TextStyle(fontSize: 22),
                     ),
                     const SizedBox(height: 4),
                     LText(
                       reviewSummary,
-                      style: TextStyle(fontSize: 14, color: muted),
+                      style: TextStyle(fontSize: 16, color: muted),
                     ),
                     const SizedBox(height: 24),
                     const Divider(height: 1),
@@ -265,42 +367,23 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       spacing: 7,
                       runSpacing: 7,
                       children: [
-                        for (final value in widget.product.colors)
+                        for (final value
+                            in (productOptions.isEmpty
+                                ? widget.product.colors
+                                : productOptions
+                                      .map((option) => option.color)
+                                      .toSet()))
                           _colorChoice(value, isDark),
                       ],
                     ),
                     const SizedBox(height: 22),
                     _optionHeading('사이즈', muted),
                     const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        for (final size in ['240', '250', '260', '270', '280'])
-                          Expanded(
-                            child: Container(
-                              height: 48,
-                              margin: const EdgeInsets.only(right: 5),
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                color: surface,
-                                border: Border.all(
-                                  color: isDark
-                                      ? Colors.white24
-                                      : const Color(0xFFE8E8E8),
-                                ),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                size,
-                                style: TextStyle(fontSize: 14, color: muted),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
+                    sizeAvailability(),
                     const SizedBox(height: 12),
                     LText(
                       '장바구니 또는 구매하기를 누르면 옵션을 선택할 수 있어요.',
-                      style: TextStyle(fontSize: 12, color: muted),
+                      style: TextStyle(fontSize: 14, color: muted),
                     ),
                     const SizedBox(height: 22),
                     Container(
@@ -320,12 +403,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             child: LText(
                               '무료 배송',
                               style: TextStyle(
-                                fontSize: 14,
+                                fontSize: 16,
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
                           ),
-                          LText('수령 후 7일 반품', style: TextStyle(fontSize: 14)),
+                          LText('수령 후 7일 반품', style: TextStyle(fontSize: 16)),
                         ],
                       ),
                     ),
@@ -344,7 +427,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           child: LText(
                             '이 상품을 본 고객이 다음으로 본 상품',
                             style: TextStyle(
-                              fontSize: 16,
+                              fontSize: 18,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -355,7 +438,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     const SizedBox(height: 5),
                     LText(
                       '예시 탐색 데이터 기반 추천',
-                      style: TextStyle(fontSize: 12, color: muted),
+                      style: TextStyle(fontSize: 14, color: muted),
                     ),
                     const SizedBox(height: 13),
                     SizedBox(
@@ -383,14 +466,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
-                                      fontSize: 12,
+                                      fontSize: 14,
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
                                   LText(
                                     won(product.price),
                                     style: TextStyle(
-                                      fontSize: 11,
+                                      fontSize: 14,
                                       color: muted,
                                     ),
                                   ),
@@ -427,7 +510,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           child: LText(
                             value,
                             style: TextStyle(
-                              fontSize: 14,
+                              fontSize: 16,
                               fontWeight: tab == value
                                   ? FontWeight.w700
                                   : FontWeight.normal,
@@ -482,10 +565,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       Expanded(
         child: LText(
           title,
-          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
         ),
       ),
-      LText('구매 시 선택', style: TextStyle(fontSize: 12, color: muted)),
+      LText('구매 시 선택', style: TextStyle(fontSize: 14, color: muted)),
     ],
   );
 
@@ -528,7 +611,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               ),
             ),
             const SizedBox(width: 6),
-            LText(value, style: const TextStyle(fontSize: 13)),
+            LText(value, style: const TextStyle(fontSize: 15)),
           ],
         ),
       ),
@@ -540,12 +623,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     children: [
       const LText(
         '상품 설명',
-        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+        style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
       ),
       const SizedBox(height: 12),
       const LText(
         '일상에 자연스럽게 어울리는 디자인과 편안한 착화감의 신발입니다. 상품 종류와 선택한 사이즈를 확인해주세요.',
-        style: TextStyle(fontSize: 14, height: 1.6),
+        style: TextStyle(fontSize: 16, height: 1.6),
       ),
       const SizedBox(height: 22),
       for (final detail in [
@@ -563,12 +646,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 child: LText(
                   detail.$1,
                   style: const TextStyle(
-                    fontSize: 14,
-                    color: Color(0xFF777777),
+                    fontSize: 16,
+                    color: Color(0xFF5F6975),
                   ),
                 ),
               ),
-              LText(detail.$2, style: const TextStyle(fontSize: 14)),
+              LText(detail.$2, style: const TextStyle(fontSize: 16)),
             ],
           ),
         ),
@@ -577,7 +660,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       const SizedBox(height: 28),
       const LText(
         '상세 사진',
-        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+        style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
       ),
       const SizedBox(height: 14),
       Row(
@@ -604,8 +687,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     LText(
                       ['전체 실루엣', '소재와 마감', '착용 예시'][index],
                       style: const TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF777777),
+                        fontSize: 14,
+                        color: Color(0xFF5F6975),
                       ),
                     ),
                   ],
@@ -628,7 +711,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           ),
           child: const LText(
             '이 상품 문의하기',
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
           ),
         ),
       ),
@@ -640,22 +723,22 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     children: [
       LText(
         '배송 안내',
-        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+        style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
       ),
       SizedBox(height: 14),
       LText(
         '결제 완료 후 본사에서 선택한 대리점으로 출고합니다. 대리점 도착 상태를 확인한 후 방문해주세요.',
-        style: TextStyle(fontSize: 14, height: 1.6),
+        style: TextStyle(fontSize: 16, height: 1.6),
       ),
       SizedBox(height: 30),
       LText(
         '반품 안내',
-        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+        style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
       ),
       SizedBox(height: 14),
       LText(
         '수령 후 7일 이내 미착용·상품 훼손 없음·구성품과 포장 유지 조건으로 반품을 신청할 수 있습니다. 상품 불량과 오배송은 별도로 검수합니다.',
-        style: TextStyle(fontSize: 14, height: 1.6),
+        style: TextStyle(fontSize: 16, height: 1.6),
       ),
     ],
   );
@@ -694,14 +777,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         child: LText(
                           '사이즈 추천',
                           style: TextStyle(
-                            fontSize: 16,
+                            fontSize: 18,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
                       ),
                       LText(
                         '실제 구매 후기 통계 · 예시 데이터',
-                        style: TextStyle(fontSize: 11, color: Colors.grey),
+                        style: TextStyle(fontSize: 14, color: Colors.grey),
                       ),
                     ],
                   ),
@@ -735,7 +818,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   const SizedBox(height: 22),
                   const LText(
                     '사이즈 선택에 참고해주세요. 개인의 발 모양에 따라 착화감은 달라질 수 있어요.',
-                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                    style: TextStyle(fontSize: 14, color: Colors.grey),
                   ),
                 ],
               ),
@@ -747,14 +830,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   child: LText(
                     '리뷰 ${widget.product.reviewCount + ownReviews.length}',
                     style: const TextStyle(
-                      fontSize: 18,
+                      fontSize: 20,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                 ),
                 const LText(
                   '리뷰는 주문 내역에서 작성할 수 있어요.',
-                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                  style: TextStyle(fontSize: 14, color: Colors.grey),
                 ),
               ],
             ),
@@ -763,13 +846,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               children: [
                 LText(
                   '4.8',
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
+                  style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700),
                 ),
                 SizedBox(width: 5),
-                LText(
-                  '★★★★★',
-                  style: TextStyle(fontSize: 15, color: Color(0xFF455B77)),
-                ),
+                RatingStars(rating: 4.8),
               ],
             ),
             const SizedBox(height: 18),
@@ -793,6 +873,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           ),
                         ],
                       ),
+                      RatingStars(rating: review.rating.toDouble()),
+                      const SizedBox(height: 8),
                       LText(
                         '사이즈 · ${review.fitSize}   발볼 · ${review.fitWidth}   착화감 · ${review.fitComfort}',
                       ),
@@ -865,17 +947,19 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     LText(
                       entry.$1,
                       style: const TextStyle(
-                        fontSize: 15,
+                        fontSize: 17,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
                     const SizedBox(height: 6),
+                    const RatingStars(rating: 5),
+                    const SizedBox(height: 8),
                     LText(
                       entry.$2,
-                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                      style: const TextStyle(fontSize: 14, color: Colors.grey),
                     ),
                     const SizedBox(height: 7),
-                    LText(entry.$3, style: const TextStyle(fontSize: 14)),
+                    LText(entry.$3, style: const TextStyle(fontSize: 16)),
                   ],
                 ),
               ),
@@ -895,10 +979,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     children: [
       Row(
         children: [
-          Expanded(child: LText(label, style: const TextStyle(fontSize: 13))),
+          Expanded(child: LText(label, style: const TextStyle(fontSize: 15))),
           LText(
             result,
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
           ),
         ],
       ),
@@ -913,11 +997,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       const SizedBox(height: 7),
       Row(
         children: [
-          LText(low, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+          LText(low, style: const TextStyle(fontSize: 14, color: Colors.grey)),
           const Spacer(),
-          LText(middle, style: const TextStyle(fontSize: 11)),
+          LText(middle, style: const TextStyle(fontSize: 14)),
           const Spacer(),
-          LText(high, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+          LText(high, style: const TextStyle(fontSize: 14, color: Colors.grey)),
         ],
       ),
     ],
@@ -1091,13 +1175,13 @@ class _ProductOptionsSheetState extends State<ProductOptionsSheet> {
                     children: [
                       LText(
                         '여러 옵션을 한 번에 선택할 수 있어요',
-                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                        style: TextStyle(fontSize: 14, color: Colors.grey),
                       ),
                       SizedBox(height: 8),
                       LText(
                         '옵션 선택',
                         style: TextStyle(
-                          fontSize: 21,
+                          fontSize: 23,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -1134,19 +1218,19 @@ class _ProductOptionsSheetState extends State<ProductOptionsSheet> {
                     LText(
                       widget.product.name,
                       style: const TextStyle(
-                        fontSize: 16,
+                        fontSize: 18,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
                     LText(
                       widget.product.category,
-                      style: const TextStyle(fontSize: 13, color: Colors.grey),
+                      style: const TextStyle(fontSize: 15, color: Colors.grey),
                     ),
                     const SizedBox(height: 6),
                     LText(
                       won(widget.product.price),
                       style: const TextStyle(
-                        fontSize: 15,
+                        fontSize: 17,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -1160,12 +1244,12 @@ class _ProductOptionsSheetState extends State<ProductOptionsSheet> {
                 const Expanded(
                   child: LText(
                     '색상',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                   ),
                 ),
                 LText(
                   selectedColor == null ? '먼저 선택해주세요' : selectedColor!,
-                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  style: const TextStyle(fontSize: 14, color: Colors.grey),
                 ),
               ],
             ),
@@ -1206,7 +1290,7 @@ class _ProductOptionsSheetState extends State<ProductOptionsSheet> {
                           },
                         ),
                         const SizedBox(width: 5),
-                        LText(value, style: const TextStyle(fontSize: 13)),
+                        LText(value, style: const TextStyle(fontSize: 15)),
                       ],
                     ),
                   ),
@@ -1218,12 +1302,12 @@ class _ProductOptionsSheetState extends State<ProductOptionsSheet> {
                 const Expanded(
                   child: LText(
                     '사이즈',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                   ),
                 ),
                 LText(
                   selectedColor == null ? '색상 선택 후 가능' : selectedColor!,
-                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  style: const TextStyle(fontSize: 14, color: Colors.grey),
                 ),
               ],
             ),
@@ -1290,7 +1374,7 @@ class _ProductOptionsSheetState extends State<ProductOptionsSheet> {
                               ? '${option.size}\n재고 ${option.availableQuantity}'
                               : '${option.size}\n${widget.store.restockKeys.contains(_restockKey(option.size)) ? '알림 신청됨' : '재입고 알림'}',
                           textAlign: TextAlign.center,
-                          style: const TextStyle(fontSize: 12),
+                          style: const TextStyle(fontSize: 14),
                         ),
                       ),
                     ),
@@ -1299,7 +1383,7 @@ class _ProductOptionsSheetState extends State<ProductOptionsSheet> {
             const SizedBox(height: 10),
             const LText(
               '선택한 색상에 따라 실제 사이즈별 재고가 표시됩니다.',
-              style: TextStyle(fontSize: 12, color: Colors.grey),
+              style: TextStyle(fontSize: 14, color: Colors.grey),
             ),
             const SizedBox(height: 20),
             Row(
@@ -1307,12 +1391,12 @@ class _ProductOptionsSheetState extends State<ProductOptionsSheet> {
                 const Expanded(
                   child: LText(
                     '선택한 옵션',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                   ),
                 ),
                 LText(
                   '${selected.length}개',
-                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  style: const TextStyle(fontSize: 14, color: Colors.grey),
                 ),
               ],
             ),
@@ -1329,7 +1413,7 @@ class _ProductOptionsSheetState extends State<ProductOptionsSheet> {
                       ),
                       child: const LText(
                         '색상과 사이즈를 선택하면 여기에 추가됩니다.',
-                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                        style: TextStyle(fontSize: 14, color: Colors.grey),
                       ),
                     )
                   : ListView(

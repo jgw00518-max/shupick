@@ -16,6 +16,110 @@ class ProfileScreen extends StatelessWidget {
   final StoreController store;
   final void Function(StorePage) onGo;
   final VoidCallback onLogout;
+  Widget _membershipCard(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final membership = store.accountBenefits?['membership'] as Map?;
+    final rawAmount = membership?['net_purchase_amount'];
+    final amount = rawAmount is num
+        ? rawAmount.toInt()
+        : int.tryParse('$rawAmount');
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        border: Border.all(color: scheme.outlineVariant),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(11),
+                decoration: BoxDecoration(
+                  color: scheme.primary.withValues(alpha: .09),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.workspace_premium_outlined,
+                  color: scheme.primary,
+                  size: 26,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    LText(
+                      '현재 등급',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    LText(
+                      '${membership?['tier_name'] ?? '등급 산정 대기'}',
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        color: scheme.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                tooltip: translateMockupText(
+                  '회원 혜택 새로고침',
+                  LocaleScope.languageOf(context),
+                ),
+                onPressed: store.benefitsLoading ? null : store.refreshBenefits,
+                icon: const Icon(Icons.refresh, size: 22),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Divider(height: 1, color: scheme.outlineVariant),
+          const SizedBox(height: 18),
+          LText(
+            '등급 산정 구매확정 금액',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 6),
+          LText(
+            amount == null ? '—' : won(amount),
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 12),
+          LText(
+            '등급은 매월 산정되며 당월 말일까지 유지됩니다.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
+          if (store.benefitsLoading) ...[
+            const SizedBox(height: 16),
+            const LinearProgressIndicator(),
+          ],
+          if (store.benefitsError != null) ...[
+            const SizedBox(height: 12),
+            LText(
+              store.benefitsError!,
+              style: theme.textTheme.bodySmall?.copyWith(color: scheme.error),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) => ListView(
     padding: const EdgeInsets.all(20),
@@ -33,39 +137,9 @@ class ProfileScreen extends StatelessWidget {
         ),
       ] else ...[
         SectionTitle('${store.userName ?? '사용자'} 님'),
-        LText(
-          '${(store.accountBenefits?['membership'] as Map?)?['tier_name'] ?? '등급 산정 대기'}',
-        ),
-        TextButton(
-          onPressed: store.benefitsLoading ? null : store.refreshBenefits,
-          child: const LText('회원 혜택 새로고침'),
-        ),
-        if (store.benefitsLoading) const LinearProgressIndicator(),
-        if (store.benefitsError != null) LText(store.benefitsError!),
         const SizedBox(height: 16),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                LText(
-                  (store.userName ?? 'U')
-                      .trim()
-                      .split(RegExp(r'\s+'))
-                      .where((word) => word.isNotEmpty)
-                      .map((word) => word[0].toUpperCase())
-                      .take(2)
-                      .join(),
-                ),
-                LText(
-                  '등급 산정 구매확정 금액 ${won(((store.accountBenefits?['membership'] as Map?)?['net_purchase_amount'] as int?) ?? 0)}',
-                ),
-                const LText('등급은 매월 산정되며 당월 말일까지 유지됩니다.'),
-              ],
-            ),
-          ),
-        ),
+        _membershipCard(context),
+        const SizedBox(height: 12),
         Row(
           children: [
             Expanded(
@@ -125,7 +199,7 @@ class ProfileScreen extends StatelessWidget {
           '주문 내역',
           StorePage.orders,
           Icons.receipt_long_outlined,
-          '배송, 교환, 반품 상태 확인',
+          '배송, 반품 상태 확인',
         ),
         ('문의 사항', StorePage.inquiry, Icons.help_outline, '문의 내역과 답변 확인'),
         (
@@ -147,7 +221,7 @@ class ProfileScreen extends StatelessWidget {
   );
 }
 
-/// 이메일 인증만 동작하는 목업 화면입니다.
+/// Firebase 계정과 MySQL 고객 프로필에 연결된 회원가입 화면입니다.
 class AuthScreen extends StatefulWidget {
   const AuthScreen({
     super.key,
@@ -169,6 +243,11 @@ class _AuthScreenState extends State<AuthScreen> {
   final email = TextEditingController();
   final password = TextEditingController();
   final confirm = TextEditingController();
+  final name = TextEditingController();
+  final phone = TextEditingController();
+  int? birthYear, birthMonth, birthDay;
+  int get daysInBirthMonth =>
+      DateTime(birthYear ?? 2000, (birthMonth ?? 1) + 1, 0).day;
   String mode = 'login';
   bool busy = false;
   @override
@@ -176,6 +255,8 @@ class _AuthScreenState extends State<AuthScreen> {
     email.dispose();
     password.dispose();
     confirm.dispose();
+    name.dispose();
+    phone.dispose();
     super.dispose();
   }
 
@@ -198,7 +279,13 @@ class _AuthScreenState extends State<AuthScreen> {
         }
         widget.onDone();
       } else if (mode == 'signupEmail') {
-        await widget.store.signUp(email.text.trim(), password.text);
+        await widget.store.signUp(
+          email.text.trim(),
+          password.text,
+          name: name.text.trim(),
+          phone: phone.text.replaceAll(RegExp(r'[^0-9]'), ''),
+          birthDate: DateTime(birthYear!, birthMonth!, birthDay!),
+        );
         widget.onMessage('회원가입이 완료되었습니다. 입력한 계정으로 로그인해주세요.');
         change('login');
       } else {
@@ -232,9 +319,9 @@ class _AuthScreenState extends State<AuthScreen> {
       ),
       const SizedBox(height: 24),
       const LText(
-        'SHUPICK',
+        'SHOEPICK',
         style: TextStyle(
-          fontSize: 30,
+          fontSize: 32,
           fontWeight: FontWeight.w900,
           letterSpacing: 1.5,
         ),
@@ -245,7 +332,7 @@ class _AuthScreenState extends State<AuthScreen> {
         'signupEmail' => '이메일로 가입',
         'reset' => '비밀번호 재설정',
         _ => '로그인',
-      }, style: const TextStyle(fontSize: 22)),
+      }, style: const TextStyle(fontSize: 24)),
       const SizedBox(height: 30),
       if (mode == 'signup') ...[
         for (final method in ['카카오', '네이버', 'Google'])
@@ -265,6 +352,133 @@ class _AuthScreenState extends State<AuthScreen> {
           key: formKey,
           child: Column(
             children: [
+              if (mode == 'signupEmail') ...[
+                TextFormField(
+                  controller: name,
+                  textInputAction: TextInputAction.next,
+                  autofillHints: const [AutofillHints.name],
+                  decoration: const InputDecoration(labelText: '이름'),
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? '이름을 입력해주세요.'
+                      : value.trim().length > 100
+                      ? '이름은 100자 이내로 입력해주세요.'
+                      : null,
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: phone,
+                  keyboardType: TextInputType.phone,
+                  textInputAction: TextInputAction.next,
+                  autofillHints: const [AutofillHints.telephoneNumber],
+                  decoration: const InputDecoration(
+                    labelText: '전화번호',
+                    hintText: '010-1234-5678',
+                  ),
+                  validator: (value) {
+                    final digits = (value ?? '').replaceAll(
+                      RegExp(r'[^0-9]'),
+                      '',
+                    );
+                    return digits.length >= 9 &&
+                            digits.length <= 15 &&
+                            RegExp(r'^[+0-9()\s-]+$').hasMatch(value ?? '')
+                        ? null
+                        : '올바른 전화번호를 입력해주세요.';
+                  },
+                ),
+                const SizedBox(height: 20),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: LText(
+                    '생년월일',
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<int>(
+                  key: ValueKey('year-$birthYear'),
+                  initialValue: birthYear,
+                  isExpanded: true,
+                  decoration: const InputDecoration(labelText: '년'),
+                  items: [
+                    for (var year = DateTime.now().year; year >= 1900; year--)
+                      DropdownMenuItem(value: year, child: LText('$year')),
+                  ],
+                  onChanged: busy
+                      ? null
+                      : (year) => setState(() {
+                          birthYear = year;
+                          if (birthDay != null &&
+                              birthDay! > daysInBirthMonth) {
+                            birthDay = null;
+                          }
+                        }),
+                  validator: (value) => value == null ? '출생 연도를 선택해주세요.' : null,
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<int>(
+                        key: ValueKey('month-$birthMonth'),
+                        initialValue: birthMonth,
+                        isExpanded: true,
+                        decoration: const InputDecoration(labelText: '월'),
+                        items: [
+                          for (var month = 1; month <= 12; month++)
+                            DropdownMenuItem(
+                              value: month,
+                              child: LText('$month'),
+                            ),
+                        ],
+                        onChanged: busy
+                            ? null
+                            : (month) => setState(() {
+                                birthMonth = month;
+                                if (birthDay != null &&
+                                    birthDay! > daysInBirthMonth) {
+                                  birthDay = null;
+                                }
+                              }),
+                        validator: (value) =>
+                            value == null ? '월을 선택해주세요.' : null,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: DropdownButtonFormField<int>(
+                        key: ValueKey('day-$birthYear-$birthMonth-$birthDay'),
+                        initialValue: birthDay,
+                        isExpanded: true,
+                        decoration: const InputDecoration(labelText: '일'),
+                        items: [
+                          for (var day = 1; day <= daysInBirthMonth; day++)
+                            DropdownMenuItem(value: day, child: LText('$day')),
+                        ],
+                        onChanged: busy
+                            ? null
+                            : (day) => setState(() => birthDay = day),
+                        validator: (value) {
+                          if (value == null) return '일을 선택해주세요.';
+                          if (birthYear != null &&
+                              birthMonth != null &&
+                              DateTime(
+                                birthYear!,
+                                birthMonth!,
+                                value,
+                              ).isAfter(DateTime.now())) {
+                            return '미래 날짜는 선택할 수 없습니다.';
+                          }
+                          return null;
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+              ],
+
               TextFormField(
                 controller: email,
                 keyboardType: TextInputType.emailAddress,

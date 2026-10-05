@@ -29,7 +29,13 @@ abstract interface class AccountBenefitsRepository {
 /// 실제 연동 시 서버가 인증과 계정 정보를 관리하도록 교체합니다.
 abstract interface class AccountRepository {
   Future<bool> signIn(String email, String password);
-  Future<void> signUp(String email, String password);
+  Future<void> signUp(
+    String email,
+    String password, {
+    String? name,
+    String? phone,
+    DateTime? birthDate,
+  });
 
   Future<bool> signInWithGoogle();
   Future<void> signOut();

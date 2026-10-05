@@ -52,7 +52,8 @@ void main() {
         ),
       ),
     );
-    expect(find.text('내 리뷰 · 5 / 5'), findsOneWidget);
+    expect(find.text('내 리뷰'), findsOneWidget);
+    expect(find.byIcon(Icons.star_rounded), findsNWidgets(15));
     expect(find.text('수정'), findsOneWidget);
     expect(find.text('삭제'), findsOneWidget);
     await tester.tap(find.text('수정'));
@@ -75,7 +76,9 @@ void main() {
       ),
     );
     expect(find.text('등록된 리뷰가 없습니다.'), findsOneWidget);
-    expect(find.text('리뷰 0 · 평균 평점 0.0'), findsOneWidget);
+    expect(find.text('리뷰 0'), findsOneWidget);
+    expect(find.text('0.0'), findsOneWidget);
+    expect(find.byIcon(Icons.star_outline_rounded), findsNWidgets(5));
   });
   testWidgets('조회 실패 시 재시도를 제공한다', (tester) async {
     var retried = false;

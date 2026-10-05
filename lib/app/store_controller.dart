@@ -339,6 +339,8 @@ class StoreController extends GetxController {
     final success = await accountRepository.signIn(email, password);
     if (success) {
       isLoggedIn = true;
+      userName = accountRepository.displayName;
+      userEmail = accountRepository.email;
       await refreshBenefits();
       _flushInteractions();
       await refreshOrders();
@@ -363,13 +365,26 @@ class StoreController extends GetxController {
     return success;
   }
 
-  Future<void> signUp(String email, String password) =>
-      accountRepository.signUp(email, password);
+  Future<void> signUp(
+    String email,
+    String password, {
+    String? name,
+    String? phone,
+    DateTime? birthDate,
+  }) => accountRepository.signUp(
+    email,
+    password,
+    name: name,
+    phone: phone,
+    birthDate: birthDate,
+  );
 
   Future<void> signOut() async {
     await accountRepository.signOut();
 
     isLoggedIn = false;
+    userName = null;
+    userEmail = null;
     accountBenefits = null;
     benefitsError = null;
     orders.clear();

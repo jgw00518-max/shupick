@@ -5,6 +5,8 @@ import '../../app/store_controller.dart';
 import '../../data/api_order_repository.dart';
 import '../../domain/models.dart';
 import '../shared/store_widgets.dart';
+import '../shared/order_history_card.dart';
+import '../shared/cart_item_options.dart';
 import 'review_sheet.dart';
 
 const pickupDistricts = [
@@ -199,49 +201,15 @@ class _CartScreenState extends State<CartScreen> {
                                 ),
                               ),
                               LText(won(item.product.price)),
-                              Row(
-                                children: [
-                                  Flexible(
-                                    child: DropdownButton<String>(
-                                      value: item.size,
-                                      items:
-                                          [
-                                                '230',
-                                                '240',
-                                                '250',
-                                                '260',
-                                                '270',
-                                                '280',
-                                              ]
-                                              .map(
-                                                (v) => DropdownMenuItem(
-                                                  value: v,
-                                                  child: LText(v),
-                                                ),
-                                              )
-                                              .toList(),
-                                      onChanged: (v) =>
-                                          _updateOption(item, size: v),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Flexible(
-                                    child: DropdownButton<String>(
-                                      value: item.color,
-                                      items:
-                                          {...item.product.colors, item.color}
-                                              .map(
-                                                (v) => DropdownMenuItem(
-                                                  value: v,
-                                                  child: LText(v),
-                                                ),
-                                              )
-                                              .toList(),
-                                      onChanged: (v) =>
-                                          _updateOption(item, color: v),
-                                    ),
-                                  ),
-                                ],
+                              CartItemOptions(
+                                key: ValueKey(item.product.id),
+                                item: item,
+                                store: widget.store,
+                                onChanged: (option) => _updateOption(
+                                  item,
+                                  size: option.size,
+                                  color: option.color,
+                                ),
                               ),
                               Row(
                                 children: [
@@ -323,7 +291,7 @@ class _CartScreenState extends State<CartScreen> {
                   alignment: Alignment.centerLeft,
                   child: LText(
                     '쿠폰·적립금은 결제 단계에서 사용하세요.',
-                    style: TextStyle(fontSize: 13, color: Color(0xFF777777)),
+                    style: TextStyle(fontSize: 15, color: Color(0xFF5F6975)),
                   ),
                 ),
                 SizedBox(
@@ -502,19 +470,80 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         SectionTitle(
           '주문 상품 ${widget.lines.fold(0, (sum, item) => sum + item.quantity)}개',
         ),
+        const SizedBox(height: 14),
         for (final item in widget.lines)
-          ListTile(
-            leading: SizedBox(
-              width: 64,
-              child: ProductImage(item.product, height: 64, color: item.color),
+          Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              border: Border.all(
+                color: Theme.of(context).colorScheme.outlineVariant,
+              ),
+              borderRadius: BorderRadius.circular(16),
             ),
-            title: LText(item.product.name),
-            subtitle: LText('${item.color} · ${item.size} · ${item.quantity}개'),
-            trailing: LText(won(item.total)),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: 76,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: ProductImage(
+                      item.product,
+                      height: 82,
+                      color: item.color,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      LText(
+                        item.product.name,
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      LText(
+                        '${item.color} · ${item.size}',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        alignment: WrapAlignment.spaceBetween,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 12,
+                        runSpacing: 6,
+                        children: [
+                          LText(
+                            '${item.quantity}개',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                          LText(
+                            won(item.total),
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.w700),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
+
         const Divider(height: 30),
         if (step == 1) ...[
           const SectionTitle('픽업 대리점'),
+          const SizedBox(height: 16),
           DropdownButtonFormField<String>(
             initialValue: district,
             decoration: const InputDecoration(
@@ -923,7 +952,7 @@ class OrdersScreen extends StatelessWidget {
               '총 주문 수량 ${order.items.fold(0, (sum, item) => sum + item.quantity)}켤레',
             ),
             LText('최종 결제 금액 ${won(order.total)}'),
-            LText('픽업 대리점 SHUPICK ${order.district}점'),
+            LText('픽업 대리점 SHOEPICK ${order.district}점'),
           ],
         ),
       ),
@@ -938,180 +967,206 @@ class OrdersScreen extends StatelessWidget {
 
   void _qr(BuildContext context, StoreOrder order) => showDialog<void>(
     context: context,
-    builder: (context) => AlertDialog(
-      title: const LText('픽업 결제 코드'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const LText('매장 픽업용'),
-          LText(order.number),
-          LText('SHUPICK ${order.district}점 직원에게 보여주세요.'),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const LText('닫기'),
+    builder: (context) {
+      final theme = Theme.of(context);
+      final scheme = theme.colorScheme;
+      return AlertDialog(
+        backgroundColor: scheme.surface,
+        surfaceTintColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: LText(
+          '픽업 결제 코드',
+          textAlign: TextAlign.center,
+          style: theme.textTheme.titleLarge,
         ),
-      ],
-    ),
-  );
-
-  @override
-  Widget build(BuildContext context) => ListView(
-    padding: const EdgeInsets.all(16),
-    children: [
-      const SectionTitle('주문 내역'),
-      TextButton(
-        onPressed: () => _returnHistory(context),
-        child: const LText('반품·환불 내역'),
-      ),
-      TextButton.icon(
-        onPressed: store.ordersLoading ? null : store.refreshOrders,
-        icon: const Icon(Icons.refresh),
-        label: const LText('새로고침'),
-      ),
-      if (store.ordersLoading) const LinearProgressIndicator(),
-      if (store.ordersError != null) LText(store.ordersError!),
-      if (!store.ordersLoading &&
-          store.ordersError == null &&
-          store.orders.isEmpty)
-        const LText('주문 내역이 없습니다. 로그인 후 주문을 확인해주세요.'),
-      const LText('주문과 배송 상태를 확인하세요.'),
-      const SizedBox(height: 16),
-      for (final order in store.orders)
-        Card(
-          child: InkWell(
-            onTap: () => _detail(context, order),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  LText(switch (order.status) {
-                    'PENDING_PAYMENT' => '결제 대기',
-                    'PAID' => '결제 완료',
-                    'PREPARING' => '상품 준비',
-                    'SHIPPING' => '배송 중',
-                    'READY_FOR_PICKUP' => '픽업 가능',
-                    'COMPLETED' => '수령 완료',
-                    'CANCELED' => '취소 완료',
-                    'REFUNDED' => '환불 완료',
-                    _ => order.status,
-                  }, style: const TextStyle(fontWeight: FontWeight.bold)),
-                  LText(
-                    '${order.date.year}.${order.date.month.toString().padLeft(2, '0')}.${order.date.day.toString().padLeft(2, '0')} · ${order.number}',
+        contentPadding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+        content: SingleChildScrollView(
+          child: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                LText(
+                  '매장 픽업용',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
                   ),
-                  const Divider(),
-                  for (final item in order.items)
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: SizedBox(
-                        width: 58,
-                        child: ProductImage(item.product, height: 58),
-                      ),
-                      title: LText(item.product.name),
-                      subtitle: LText(
-                        '${item.color} · ${item.size} · ${item.quantity}개',
-                      ),
-                      trailing: LText(won(item.total)),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 20,
+                  ),
+                  decoration: BoxDecoration(
+                    color: scheme.primary.withValues(alpha: .06),
+                    border: Border.all(
+                      color: scheme.primary.withValues(alpha: .2),
                     ),
-                  if (!order.canceled) ...[
-                    if (order.status == 'COMPLETED')
-                      TextButton(
-                        onPressed: order.purchaseConfirmed
-                            ? null
-                            : () async {
-                                final confirmed = await showDialog<bool>(
-                                  context: context,
-                                  builder: (context) => AlertDialog(
-                                    title: const LText('구매확정'),
-                                    content: const LText(
-                                      '구매확정 후에는 반품·환불이 불가능합니다. 구매확정하면 리뷰를 작성할 수 있으며 최초 작성 시 1,000P가 적립됩니다. 구매확정 금액은 다음 회원등급 산정에 반영됩니다. 확정할까요?',
-                                    ),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () =>
-                                            Navigator.pop(context, false),
-                                        child: const LText('닫기'),
-                                      ),
-                                      FilledButton(
-                                        onPressed: () =>
-                                            Navigator.pop(context, true),
-                                        child: const LText('확정'),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                                if (confirmed != true) return;
-                                try {
-                                  await store.confirmPurchase(order);
-                                  onMessage('구매확정이 완료되었습니다.');
-                                } catch (error) {
-                                  onMessage('구매확정 실패: $error');
-                                }
-                              },
-                        child: LText(
-                          order.purchaseConfirmed ? '구매확정 완료' : '구매확정',
-                        ),
-                      ),
-                    if (order.status == 'COMPLETED' && !order.purchaseConfirmed)
-                      TextButton(
-                        onPressed: () => _return(context, order),
-                        child: const LText('상품 선택 반품 신청'),
-                      ),
-                    for (final item in order.items)
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton(
-                          onPressed:
-                              !order.purchaseConfirmed ||
-                                  order.status != 'COMPLETED' ||
-                                  store.hasReview(order, item)
-                              ? null
-                              : () {
-                                  showModalBottomSheet<void>(
-                                    context: context,
-                                    isScrollControlled: true,
-                                    showDragHandle: true,
-                                    builder: (_) => ReviewSheet(
-                                      order: order,
-                                      item: item,
-                                      store: store,
-                                      onSaved: () => onMessage('리뷰가 저장되었어요.'),
-                                    ),
-                                  );
-                                },
-                          child: LText(
-                            store.hasReview(order, item)
-                                ? '작성 완료'
-                                : !order.purchaseConfirmed
-                                ? '구매확정 후 작성'
-                                : '리뷰 작성 (1,000P)',
-                          ),
-                        ),
-                      ),
-                    const LText('결제 완료  ›  상품 준비  ›  배송 중  ›  픽업 완료'),
-                    Row(
-                      children: [
-                        TextButton(
-                          onPressed: () => onShipping(order),
-                          child: const LText('배송 조회'),
-                        ),
-                        TextButton(
-                          onPressed: () => _qr(context, order),
-                          child: const LText('결제 코드 확인'),
-                        ),
-                      ],
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: SelectableText(
+                    order.number,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: .6,
+                      height: 1.5,
+                      color: scheme.primary,
                     ),
-                    const LText('대리점 픽업 시 결제 코드를 보여주세요.'),
-                  ] else
-                    const LText('주문이 취소되었습니다. 결제 수단에 따라 영업일 기준 2~5일 이내 환불됩니다.'),
-                ],
-              ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                LText(
+                  'SHOEPICK ${order.district}점 직원에게 보여주세요.',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium,
+                ),
+              ],
             ),
           ),
         ),
-    ],
+        actionsAlignment: MainAxisAlignment.center,
+        actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+        actions: [
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: () => Navigator.pop(context),
+              child: const LText('닫기', textAlign: TextAlign.center),
+            ),
+          ),
+        ],
+      );
+    },
   );
+
+  Future<void> _confirmPurchase(BuildContext context, StoreOrder order) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const LText('구매확정'),
+        content: const LText(
+          '구매확정 후에는 반품·환불이 불가능합니다. 구매확정하면 리뷰를 작성할 수 있으며 최초 작성 시 1,000P가 적립됩니다. 구매확정 금액은 다음 회원등급 산정에 반영됩니다. 확정할까요?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const LText('닫기'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const LText('확정'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await store.confirmPurchase(order);
+      onMessage('구매확정이 완료되었습니다.');
+    } catch (error) {
+      onMessage('구매확정 실패: $error');
+    }
+  }
+
+  void _writeReview(BuildContext context, StoreOrder order, CartItem item) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => ReviewSheet(
+        order: order,
+        item: item,
+        store: store,
+        onSaved: () => onMessage('리뷰가 저장되었어요.'),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return RefreshIndicator(
+      onRefresh: store.refreshOrders,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+        children: [
+          const SectionTitle('나의 주문'),
+          const SizedBox(height: 8),
+          LText(
+            '주문과 배송 상태를 확인하세요.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 12,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              LText(
+                '전체 주문 ${store.orders.length}건',
+                style: theme.textTheme.titleSmall,
+              ),
+              TextButton(
+                onPressed: () => _returnHistory(context),
+                child: const LText('반품·환불 내역'),
+              ),
+              IconButton(
+                tooltip: '새로고침',
+                onPressed: store.ordersLoading ? null : store.refreshOrders,
+                icon: const Icon(Icons.refresh_rounded),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (store.ordersLoading) ...[
+            const LinearProgressIndicator(),
+            const SizedBox(height: 16),
+          ],
+          if (store.ordersError != null)
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    LText(store.ordersError!),
+                    TextButton(
+                      onPressed: store.refreshOrders,
+                      child: const LText('다시 시도'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          if (!store.ordersLoading &&
+              store.ordersError == null &&
+              store.orders.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 40),
+              child: EmptyState('주문 내역이 없습니다. 로그인 후 주문을 확인해주세요.'),
+            ),
+          for (final order in store.orders)
+            OrderHistoryCard(
+              order: order,
+              onDetail: () => _detail(context, order),
+              onShipping: () => onShipping(order),
+              onCode: () => _qr(context, order),
+              onConfirm: () => _confirmPurchase(context, order),
+              onReturn: () => _return(context, order),
+              hasReview: (item) => store.hasReview(order, item),
+              onReview: (item) => _writeReview(context, order, item),
+            ),
+        ],
+      ),
+    );
+  }
 }

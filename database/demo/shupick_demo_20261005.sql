@@ -357,14 +357,21 @@ BEGIN
     WHERE c.seq<=6;
 
   -- Integrity gates: failures roll back all InnoDB business rows.
+  -- MySQL 1137: reference each temporary table only once per statement.
+  IF (SELECT COUNT(*) FROM reviews r JOIN demo26_orders d ON d.order_item_id=r.order_item_id)<>12 THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='DEMO26 review count does not match.';
+  END IF;
+  IF (SELECT COUNT(*) FROM return_requests r JOIN demo26_orders d ON d.order_id=r.order_id)<>6 THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='DEMO26 return count does not match.';
+  END IF;
+  IF EXISTS(SELECT 1 FROM demo26_orders d JOIN orders o ON o.order_id=d.order_id
+    JOIN order_items oi ON oi.order_id=o.order_id WHERE o.subtotal_amount<>oi.line_total) THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='DEMO26 order totals do not match.';
+  END IF;
   IF (SELECT COUNT(*) FROM products WHERE model_code LIKE 'DEMO26-P%')<>24
      OR (SELECT COUNT(*) FROM product_variants v JOIN products p ON p.product_id=v.product_id WHERE p.model_code LIKE 'DEMO26-P%')<>240
      OR (SELECT COUNT(*) FROM orders WHERE order_number LIKE 'DEMO26-O%')<>36
-     OR (SELECT COUNT(*) FROM reviews r JOIN demo26_orders d ON d.order_item_id=r.order_item_id)<>12
-     OR (SELECT COUNT(*) FROM return_requests r JOIN demo26_orders d ON d.order_id=r.order_id)<>6
      OR (SELECT COUNT(*) FROM purchase_requisitions WHERE title LIKE '[DEMO26]%')<>6
-     OR EXISTS(SELECT 1 FROM demo26_orders d JOIN orders o ON o.order_id=d.order_id
-       JOIN order_items oi ON oi.order_id=o.order_id WHERE o.subtotal_amount<>oi.line_total)
      OR EXISTS(SELECT 1 FROM headquarters_inventory h JOIN product_variants v ON v.product_variant_id=h.product_variant_id
        JOIN products p ON p.product_id=v.product_id WHERE p.model_code LIKE 'DEMO26-P%'
        AND h.reserved_quantity<>(SELECT COALESCE(SUM(r.reserved_quantity),0) FROM inventory_reservations r
