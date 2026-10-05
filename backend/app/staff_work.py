@@ -227,7 +227,10 @@ def staff_customer_detail(customer_id: int, _: CurrentEmployee = Depends(require
 
 
 @router.get("/returns")
-def staff_returns(employee: CurrentEmployee = Depends(get_current_employee)) -> list[dict]:
+def staff_returns(
+    branch_id: int | None = Query(default=None, alias="branchId"),
+    employee: CurrentEmployee = Depends(get_current_employee),
+) -> list[dict]:
     try:
         with mysql_connection() as connection:
             with connection.cursor() as cursor:
@@ -240,12 +243,13 @@ def staff_returns(employee: CurrentEmployee = Depends(get_current_employee)) -> 
                        JOIN orders o ON o.order_id=rr.order_id
                        JOIN customers c ON c.customer_id=rr.customer_id
                        JOIN branches b ON b.branch_id=rr.branch_id
-                       WHERE %s=1 OR EXISTS (
+                       WHERE (%s IS NULL OR rr.branch_id=%s)
+                         AND (%s=1 OR EXISTS (
                            SELECT 1 FROM employee_branch_assignments eba
                            WHERE eba.employee_id=%s AND eba.branch_id=rr.branch_id
-                             AND eba.ended_at IS NULL)
+                             AND eba.ended_at IS NULL))
                        ORDER BY rr.requested_at DESC,rr.return_request_id DESC LIMIT 100""",
-                    (int(is_hq), employee.employee_id),
+                    (branch_id, branch_id, int(is_hq), employee.employee_id),
                 )
                 rows = cursor.fetchall()
     except MySQLError as error:
