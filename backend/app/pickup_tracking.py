@@ -50,6 +50,8 @@ def arrive(fulfillment_id: int, employee: CurrentEmployee = Depends(require_perm
             cursor.execute('SELECT * FROM fulfillments WHERE fulfillment_id=%s FOR UPDATE', (fulfillment_id,))
             fulfillment = cursor.fetchone()
             if fulfillment is None: raise HTTPException(404,'Fulfillment not found')
+            cursor.execute('SELECT 1 FROM employee_branch_assignments WHERE employee_id=%s AND branch_id=%s AND ended_at IS NULL', (employee.employee_id,fulfillment['destination_branch_id']))
+            if cursor.fetchone() is None: raise HTTPException(403,'Employee is not assigned to this branch')
             cursor.execute('SELECT * FROM orders WHERE order_id=%s FOR UPDATE', (fulfillment['order_id'],))
             order = cursor.fetchone()
             if order['order_status'] in ('CANCELED','REFUNDED'): raise HTTPException(409,'Order inactive')
@@ -82,6 +84,8 @@ def complete_pickup(order_id: int, request: PickupConfirmation, employee: Curren
             cursor.execute('SELECT * FROM orders WHERE order_id=%s FOR UPDATE', (order_id,))
             order = cursor.fetchone()
             if order is None: raise HTTPException(404,'Order not found')
+            cursor.execute('SELECT 1 FROM employee_branch_assignments WHERE employee_id=%s AND branch_id=%s AND ended_at IS NULL', (employee.employee_id,order['pickup_branch_id']))
+            if cursor.fetchone() is None: raise HTTPException(403,'Employee is not assigned to this branch')
             if request.paymentCode != order['order_number']: raise HTTPException(403,'Payment code mismatch')
             if order['order_status']=='COMPLETED': return {'status':'COMPLETED'}
             if order['order_status']!='READY_FOR_PICKUP': raise HTTPException(409,'Order is not ready for pickup')

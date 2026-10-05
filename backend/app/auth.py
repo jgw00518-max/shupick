@@ -14,7 +14,7 @@ from pymysql import MySQLError
 
 from .config import settings
 from .database import mysql_connection
-from .schemas import CustomerProfileResponse, CustomerProfileSyncRequest
+from .schemas import CustomerProfileResponse, CustomerProfileSyncRequest, EmployeeProfileResponse
 
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -272,3 +272,55 @@ def get_my_profile(current: CurrentCustomer = Depends(get_current_customer)) -> 
     except MySQLError as error:
         raise HTTPException(status_code=503, detail="Database unavailable") from error
     return _profile_response(row)
+
+
+@router.get("/employee/me", response_model=EmployeeProfileResponse)
+def get_employee_profile(
+    current: CurrentEmployee = Depends(get_current_employee),
+) -> EmployeeProfileResponse:
+    """Return only active roles and current branch assignments for this employee."""
+
+    try:
+        with mysql_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """SELECT r.role_code,r.role_name
+                    FROM employee_roles er JOIN roles r ON r.role_id=er.role_id
+                    WHERE er.employee_id=%s AND r.is_active=TRUE
+                    ORDER BY r.role_code""",
+                    (current.employee_id,),
+                )
+                roles = cursor.fetchall()
+                cursor.execute(
+                    """SELECT DISTINCT b.branch_id,b.branch_code,b.branch_name,b.district_code
+                    FROM employee_branch_assignments eba
+                    JOIN branches b ON b.branch_id=eba.branch_id
+                    WHERE eba.employee_id=%s AND eba.ended_at IS NULL AND b.is_active=TRUE
+                    ORDER BY b.branch_name,b.branch_id""",
+                    (current.employee_id,),
+                )
+                branches = cursor.fetchall()
+    except MySQLError as error:
+        raise HTTPException(status_code=503, detail="Database unavailable") from error
+
+    if not roles:
+        raise HTTPException(status_code=403, detail="Active employee role is required")
+
+    return EmployeeProfileResponse(
+        employeeId=current.employee_id,
+        employeeCode=current.employee_code,
+        employeeName=current.employee_name,
+        roles=[
+            {"roleCode": row["role_code"], "roleName": row["role_name"]}
+            for row in roles
+        ],
+        branches=[
+            {
+                "branchId": int(row["branch_id"]),
+                "branchCode": row["branch_code"],
+                "branchName": row["branch_name"],
+                "districtCode": row["district_code"],
+            }
+            for row in branches
+        ],
+    )

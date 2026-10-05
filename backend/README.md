@@ -67,3 +67,12 @@ purchase confirmation are separate policies, not included in this worker.
 ```powershell
 .\.venv\Scripts\python.exe -m pytest
 ```
+
+
+## 직원용 태블릿 로그인
+
+직원 앱은 고객용 앱과 같은 Firebase 프로젝트를 사용합니다. 직원용 Android/iOS 앱은 Firebase 프로젝트에 별도 등록해야 합니다. 앱은 Firebase 이메일·비밀번호 로그인 후 ID 토큰을 `GET /auth/employee/me`에 전달합니다. API는 활성 `employees.firebase_uid`로 직원을 찾고 활성 직책 및 종료되지 않은 소속 지점 배정만 반환합니다.
+
+직원 계정은 앱에서 가입할 수 없습니다. 관리자가 Firebase Authentication에 계정을 만든 다음, 발급된 UID를 해당 `employees.firebase_uid`에 연결하고 `employee_roles`에 직책을 배정합니다. 대리점 직책은 `employee_branch_assignments`에 현재 지점 배정(`ended_at IS NULL`)이 있어야 앱에 들어갈 수 있습니다. 기존 시드 직원의 `legacy-employee-*` UID는 실제 Firebase 계정 UID로 교체해야 합니다.
+
+직원용 앱의 추가 직책 코드 `BRANCH_MANAGER`와 `EXECUTIVE`는 `database/migrations/018_staff_display_roles.sql`에 정의되어 있습니다. 이 마이그레이션을 적용한 뒤 필요한 직원에게 직책을 배정합니다. 직원 인증 API는 지점 배정을 조회하지만 주문·입고·수령 처리 API의 지점별 권한 검사는 별도 작업으로 보완해야 합니다.

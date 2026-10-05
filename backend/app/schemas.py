@@ -49,6 +49,26 @@ class PickupBranchResponse(BaseModel):
     businessHours: list[dict] = Field(default_factory=list)
 
 
+class EmployeeRoleResponse(BaseModel):
+    roleCode: str
+    roleName: str
+
+
+class EmployeeBranchResponse(BaseModel):
+    branchId: int
+    branchCode: str
+    branchName: str
+    districtCode: str
+
+
+class EmployeeProfileResponse(BaseModel):
+    employeeId: int
+    employeeCode: str
+    employeeName: str
+    roles: list[EmployeeRoleResponse]
+    branches: list[EmployeeBranchResponse]
+
+
 class RefundItemRequest(BaseModel):
     """One order line and quantity included in a return refund."""
 

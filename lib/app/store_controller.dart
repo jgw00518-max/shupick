@@ -206,9 +206,6 @@ class StoreController extends GetxController {
         };
       }
       await refreshOrders();
-      reviews
-        ..clear()
-        ..addAll(await reviewRepository.getReviews());
       final shopping = await shoppingRepository.load(products);
       cart
         ..clear()
@@ -219,12 +216,6 @@ class StoreController extends GetxController {
       recentIds
         ..clear()
         ..addAll(shopping.recentIds);
-      inquiries
-        ..clear()
-        ..addAll(await supportRepository.getInquiries());
-      restockKeys
-        ..clear()
-        ..addAll(await supportRepository.getRestockKeys());
     } catch (_) {
       loadError = '상품을 불러오지 못했습니다.';
     } finally {
