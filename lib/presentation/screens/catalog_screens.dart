@@ -584,7 +584,7 @@ class _ProductCollectionScreenState extends State<ProductCollectionScreen> {
             child: CollectionProductCard(
               product: product,
               onOpen: () => widget.onOpen(product),
-              onRemove: widget.canRemove
+              onRemove: widget.canRemove && widget.store.shoppingReady
                   ? () => widget.store.toggleWish(product)
                   : null,
             ),

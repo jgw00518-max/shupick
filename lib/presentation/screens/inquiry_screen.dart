@@ -112,6 +112,13 @@ class _InquiryScreenState extends State<InquiryScreen> {
     padding: const EdgeInsets.all(20),
     children: [
       const SectionTitle('문의 사항'),
+      if (widget.store.supportError != null) ...[
+        LText(widget.store.supportError!),
+        TextButton(
+          onPressed: widget.store.refreshSupport,
+          child: const LText('문의 다시 시도'),
+        ),
+      ],
       LText(
         widget.product == null
             ? '궁금한 점을 남기면 빠르게 답변해드려요.'

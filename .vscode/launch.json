@@ -1,0 +1,14 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "SHOEPICK - local MySQL + social login",
+      "request": "launch",
+      "type": "dart",
+      "cwd": "${workspaceFolder}",
+      "program": "lib/main.dart",
+      "templateFor": "lib",
+      "toolArgs": ["--dart-define-from-file=${workspaceFolder}/social-login.local.json"]
+    }
+  ]
+}

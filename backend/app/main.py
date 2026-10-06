@@ -6,6 +6,8 @@ from pymysql import MySQLError
 from .auth import router as auth_router
 from .staff_registration import router as staff_registration_router
 from .staff_orders import router as staff_orders_router
+from .customer_enrollment import router as enrollment_router
+from .social_auth import router as social_auth_router, install_social_auth_access_log_filter
 from .staff_work import router as staff_work_router
 from .branches import router as branches_router
 from .checkout_benefits import router as benefits_router
@@ -27,10 +29,13 @@ from .pickup_tracking import router as pickup_router
 from .status_history import router as status_history_router
 
 
+install_social_auth_access_log_filter()
 app = FastAPI(title="Shupick API", version="0.1.0")
 app.include_router(auth_router)
 app.include_router(staff_registration_router)
 app.include_router(staff_orders_router)
+app.include_router(enrollment_router)
+app.include_router(social_auth_router)
 app.include_router(staff_work_router)
 app.include_router(branches_router)
 app.include_router(benefits_router)

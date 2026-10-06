@@ -47,6 +47,9 @@ void main() {
         shoppingRepository: MockShoppingRepository(),
         supportRepository: MockSupportRepository(),
       );
+      await store.load();
+      store.products = [];
+      store.wishedIds.clear();
       store.products.addAll([first, if (count == 2) second]);
       store.wishedIds.addAll([1, if (count == 2) 2]);
       Future<void> render() => tester.pumpWidget(

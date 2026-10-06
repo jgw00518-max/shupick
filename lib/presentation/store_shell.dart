@@ -8,6 +8,7 @@ import 'shared/app_theme.dart';
 import '../app/store_controller.dart';
 import '../app/store_navigation_controller.dart';
 import '../domain/repositories.dart';
+import '../domain/customer_enrollment.dart';
 import '../domain/models.dart';
 import 'screens/account_screens.dart';
 import 'screens/catalog_screens.dart';
@@ -150,6 +151,18 @@ class _StoreShellState extends State<StoreShell> {
     StorePage.settings => '설정',
   };
 
+  bool get requiresProducts => {
+    StorePage.home,
+    StorePage.catalog,
+    StorePage.search,
+    StorePage.campaign,
+    StorePage.detail,
+    StorePage.recent,
+    StorePage.wish,
+    StorePage.cart,
+    StorePage.checkout,
+  }.contains(page);
+
   @override
   Widget build(BuildContext context) => GetBuilder<StoreNavigationController>(
     builder: (_) => GetBuilder<StoreController>(
@@ -217,15 +230,53 @@ class _StoreShellState extends State<StoreShell> {
                     ],
                   ),
             drawer: page == StorePage.auth ? null : _drawer(),
-            body: store.loading
-                ? const Center(child: CircularProgressIndicator())
-                : store.loadError != null
-                ? EmptyState(
-                    store.loadError!,
-                    action: '다시 시도',
-                    onAction: store.load,
-                  )
-                : _body(),
+            body: Column(
+              children: [
+                if (store.accountConnectionError != null &&
+                    page != StorePage.auth)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    child: Column(
+                      children: [
+                        LText(store.accountConnectionError!),
+                        TextButton(
+                          onPressed: store.loading ? null : store.load,
+                          child: const LText('회원 연결 다시 시도'),
+                        ),
+                      ],
+                    ),
+                  ),
+                if (store.shoppingError != null && requiresProducts)
+                  Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: Column(
+                      children: [
+                        LText(store.shoppingError!),
+                        TextButton(
+                          onPressed: store.loading || store.shoppingLoading
+                              ? null
+                              : store.load,
+                          child: const LText('다시 시도'),
+                        ),
+                      ],
+                    ),
+                  ),
+                Expanded(
+                  child: store.loading && requiresProducts
+                      ? const Center(child: CircularProgressIndicator())
+                      : store.loadError != null && requiresProducts
+                      ? EmptyState(
+                          store.loadError!,
+                          action: '다시 시도',
+                          onAction: store.load,
+                        )
+                      : _body(),
+                ),
+              ],
+            ),
             bottomNavigationBar: page == StorePage.auth
                 ? null
                 : Container(
@@ -393,6 +444,11 @@ class _StoreShellState extends State<StoreShell> {
       onMessage: message,
     ),
     StorePage.settings => SettingsScreen(
+      enrollmentRepository:
+          store.isLoggedIn &&
+              store.accountRepository is EnrollmentAccountRepository
+          ? store.accountRepository as EnrollmentAccountRepository
+          : null,
       dark: dark,
       language: language,
       push: push,

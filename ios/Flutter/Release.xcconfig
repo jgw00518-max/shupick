@@ -1,1 +1,3 @@
 #include "Generated.xcconfig"
+KAKAO_NATIVE_APP_KEY=unconfigured
+#include? "SocialLogin.local.xcconfig"

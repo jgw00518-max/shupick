@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 
 import '../domain/models.dart';
 import '../domain/repositories.dart';
+import '../domain/customer_enrollment.dart';
 
 /// 화면 상태를 관리하며 저장과 조회는 Repository에 위임합니다.
 class StoreController extends GetxController {
@@ -67,18 +68,24 @@ class StoreController extends GetxController {
   /// 마이페이지의 회원등급·쿠폰·포인트 원장을 갱신합니다.
   Future<void> refreshBenefits() async {
     final repository = orderRepository;
-    if (repository is! AccountBenefitsRepository) return;
+    if (repository is! AccountBenefitsRepository || _authTransition) return;
+    final generation = _accountGeneration;
     benefitsLoading = true;
     benefitsError = null;
     update();
     try {
-      accountBenefits = await (repository as AccountBenefitsRepository)
+      final loaded = await (repository as AccountBenefitsRepository)
           .getAccountBenefits();
+      if (generation != _accountGeneration) return;
+      accountBenefits = loaded;
     } catch (_) {
+      if (generation != _accountGeneration) return;
       benefitsError = '회원 혜택을 불러오지 못했습니다.';
     } finally {
-      benefitsLoading = false;
-      update();
+      if (generation == _accountGeneration) {
+        benefitsLoading = false;
+        update();
+      }
     }
   }
 
@@ -104,26 +111,186 @@ class StoreController extends GetxController {
   bool isLoggedIn = false;
   String? userName;
   String? userEmail;
+  String? userId;
+  AccountLoginProvider? loginProvider;
+  String? get accountIdentityKey => userId ?? userEmail;
+
+  /// Email-login labels are presentation only; never change account identity.
+  String? get profileDisplayName {
+    if (isLoggedIn && loginProvider == AccountLoginProvider.email) {
+      final address = userEmail?.trim();
+      if (address != null) {
+        final separator = address.indexOf('@');
+        if (separator > 0 && separator < address.length - 1) {
+          return address.substring(0, separator).trim();
+        }
+      }
+    }
+    return userName;
+  }
+
   bool ordersLoading = false;
   String? ordersError;
+  String? reviewsError;
+  String? supportError;
+  String? shoppingError;
+  String? accountConnectionError;
+  bool shoppingLoading = true;
+  bool _shoppingReady = false;
+  bool _authTransition = false;
+  int _shoppingGeneration = 0;
+  int _accountGeneration = 0;
+  String? _shoppingIdentity;
+
+  String? get _currentShoppingIdentity =>
+      isLoggedIn ? accountIdentityKey : null;
+
+  bool get _canChangeShopping =>
+      !_authTransition &&
+      !shoppingLoading &&
+      _shoppingReady &&
+      _shoppingIdentity == _currentShoppingIdentity;
+
+  bool get shoppingReady => _canChangeShopping;
+
+  void _clearShopping() {
+    cart.clear();
+    wishedIds.clear();
+    recentIds.clear();
+  }
+
+  /// Never apply an earlier account's late SQLite result to the current UI.
+  Future<void> _reloadShoppingForAccount() async {
+    final generation = ++_shoppingGeneration;
+    final identity = _currentShoppingIdentity;
+    _shoppingIdentity = identity;
+    final repository = shoppingRepository;
+    if (repository is AccountScopedShoppingRepository) {
+      (repository as AccountScopedShoppingRepository).selectAccount(identity);
+    }
+    shoppingLoading = true;
+    _shoppingReady = false;
+    shoppingError = null;
+    _clearShopping();
+    update();
+    try {
+      final shopping = await repository.load(products);
+      if (generation != _shoppingGeneration ||
+          identity != _currentShoppingIdentity) {
+        return;
+      }
+      cart.addAll(shopping.cart);
+      wishedIds.addAll(shopping.wishedIds);
+      recentIds.addAll(shopping.recentIds);
+      _shoppingReady = true;
+    } catch (_) {
+      if (generation == _shoppingGeneration) {
+        shoppingError = '저장된 장바구니·찜 정보를 불러오지 못했습니다.';
+      }
+    } finally {
+      if (generation == _shoppingGeneration) {
+        shoppingLoading = false;
+        update();
+      }
+    }
+  }
+
+  void _readAccountIdentity() {
+    final previousIdentity = _currentShoppingIdentity;
+    userName = accountRepository.displayName;
+    userEmail = accountRepository.email;
+    final repository = accountRepository;
+    userId = repository is IdentityAccountRepository
+        ? (repository as IdentityAccountRepository).userId
+        : null;
+    isLoggedIn = repository is IdentityAccountRepository
+        ? userId != null
+        : userEmail != null;
+    loginProvider = isLoggedIn && repository is LoginProviderAccountRepository
+        ? (repository as LoginProviderAccountRepository).loginProvider
+        : null;
+    if (previousIdentity != _currentShoppingIdentity) {
+      _accountGeneration++;
+      _shoppingGeneration++;
+      _shoppingReady = false;
+      _clearShopping();
+      // Account switch failures must not leave the previous member's cache.
+      orders.clear();
+      reviews.clear();
+      inquiries.clear();
+      restockKeys.clear();
+      accountBenefits = null;
+      ordersLoading = false;
+      benefitsLoading = false;
+      ordersError = null;
+      reviewsError = null;
+      supportError = null;
+      benefitsError = null;
+    }
+  }
+
+  Future<void> _restoreAccount() async {
+    final repository = accountRepository;
+    accountConnectionError = null;
+    if (repository is! SessionAccountRepository) return;
+    try {
+      isLoggedIn = await (repository as SessionAccountRepository)
+          .restoreSession();
+      _readAccountIdentity();
+    } catch (_) {
+      _readAccountIdentity();
+      accountConnectionError = '회원 정보 연결에 실패했습니다. 연결을 다시 시도해주세요.';
+      orders.clear();
+      reviews.clear();
+      inquiries.clear();
+      restockKeys.clear();
+      accountBenefits = null;
+    }
+  }
 
   /// 로그인 고객의 주문을 다시 읽고 조회 실패를 상품 로딩과 분리합니다.
   Future<void> refreshOrders() async {
+    if (accountConnectionError != null || _authTransition) return;
+    final generation = _accountGeneration;
     ordersLoading = true;
     ordersError = null;
     update();
     try {
-      orders = List.of(await orderRepository.getOrders());
-      reviews
-        ..clear()
-        ..addAll(await reviewRepository.getReviews());
-      await refreshSupport();
+      final loaded = await orderRepository.getOrders();
+      if (generation != _accountGeneration) return;
+      orders = List.of(loaded);
     } catch (_) {
+      if (generation != _accountGeneration) return;
+      orders.clear();
       ordersError = '주문 내역을 불러오지 못했습니다. 다시 시도해주세요.';
     } finally {
-      ordersLoading = false;
-      update();
+      if (generation == _accountGeneration) {
+        ordersLoading = false;
+        update();
+      }
     }
+    if (generation != _accountGeneration) return;
+    await refreshReviews();
+    if (generation != _accountGeneration) return;
+    await refreshSupport();
+  }
+
+  Future<void> refreshReviews() async {
+    if (accountConnectionError != null || _authTransition) return;
+    final generation = _accountGeneration;
+    reviewsError = null;
+    try {
+      final loaded = await reviewRepository.getReviews();
+      if (generation != _accountGeneration) return;
+      reviews
+        ..clear()
+        ..addAll(loaded);
+    } catch (_) {
+      if (generation != _accountGeneration) return;
+      reviews.clear();
+      reviewsError = '리뷰를 불러오지 못했습니다. 다시 시도해주세요.';
+    }
+    update();
   }
 
   @override
@@ -172,9 +339,15 @@ class StoreController extends GetxController {
 
   /// 목업 데이터도 비동기로 읽어 API 교체 시 UI 흐름을 유지합니다.
   Future<void> load() async {
+    if (_loadInProgress || _authTransition) return;
+    _loadInProgress = true;
     loading = true;
+    shoppingLoading = true;
+    _shoppingReady = false;
     loadError = null;
     update();
+    await _restoreAccount();
+    final accountGeneration = _accountGeneration;
     try {
       products = await productsRepository.getProducts();
       if (productsRepository is CatalogRepository) {
@@ -205,26 +378,31 @@ class StoreController extends GetxController {
                 .toList(),
         };
       }
-      await refreshOrders();
-      final shopping = await shoppingRepository.load(products);
-      cart
-        ..clear()
-        ..addAll(shopping.cart);
-      wishedIds
-        ..clear()
-        ..addAll(shopping.wishedIds);
-      recentIds
-        ..clear()
-        ..addAll(shopping.recentIds);
     } catch (_) {
       loadError = '상품을 불러오지 못했습니다.';
+    }
+    // 로컬 쇼핑 정보 및 회원 전용 조회는 상품 오류 상태와 분리합니다.
+    try {
+      if (accountGeneration == _accountGeneration && !_authTransition) {
+        await _reloadShoppingForAccount();
+      }
+      if (accountGeneration == _accountGeneration &&
+          !_authTransition &&
+          accountConnectionError == null) {
+        await refreshOrders();
+        if (isLoggedIn) await refreshBenefits();
+      }
     } finally {
+      _loadInProgress = false;
       loading = false;
       update();
     }
   }
 
+  bool _loadInProgress = false;
+
   void view(Product product) {
+    if (!_canChangeShopping) return;
     _recordInteraction('VIEW', product);
     recentIds.remove(product.id);
     recentIds.insert(0, product.id);
@@ -233,6 +411,7 @@ class StoreController extends GetxController {
   }
 
   void toggleWish(Product product) {
+    if (!_canChangeShopping) return;
     if (!wishedIds.remove(product.id)) wishedIds.add(product.id);
     _recordInteraction(
       wishedIds.contains(product.id) ? 'WISH_ADD' : 'WISH_REMOVE',
@@ -247,6 +426,7 @@ class StoreController extends GetxController {
   }
 
   void addCartItems(List<CartItem> items) {
+    if (!_canChangeShopping) return;
     for (final item in items) {
       _recordInteraction(
         'CART_ADD',
@@ -269,6 +449,7 @@ class StoreController extends GetxController {
   }
 
   void changeQuantity(CartItem item, int quantity) {
+    if (!_canChangeShopping) return;
     final index = cart.indexWhere((entry) => entry.key == item.key);
     if (index < 0) return;
     cart[index] = cart[index].copyWith(quantity: quantity.clamp(1, 99));
@@ -284,6 +465,7 @@ class StoreController extends GetxController {
   }
 
   void updateCartOption(CartItem item, {String? size, String? color}) {
+    if (!_canChangeShopping) return;
     final index = cart.indexWhere((entry) => entry.key == item.key);
     if (index < 0) return;
     final updated = cart[index].copyWith(size: size, color: color);
@@ -311,6 +493,7 @@ class StoreController extends GetxController {
   }
 
   void removeCartKeys(Set<String> keys) {
+    if (!_canChangeShopping) return;
     for (final item in cart.where((item) => keys.contains(item.key))) {
       _recordInteraction(
         'CART_REMOVE',
@@ -326,21 +509,33 @@ class StoreController extends GetxController {
   }
 
   Future<void> _saveShopping() async {
-    await shoppingRepository.save(
-      ShoppingSnapshot(
-        cart: List.of(cart),
-        wishedIds: Set.of(wishedIds),
-        recentIds: List.of(recentIds),
-      ),
-    );
+    if (!_canChangeShopping) return;
+    final generation = _shoppingGeneration;
+    try {
+      await shoppingRepository.save(
+        ShoppingSnapshot(
+          cart: List.of(cart),
+          wishedIds: Set.of(wishedIds),
+          recentIds: List.of(recentIds),
+        ),
+      );
+    } catch (_) {
+      if (generation == _shoppingGeneration) {
+        shoppingError = '장바구니·찜 정보를 저장하지 못했습니다. 다시 시도해주세요.';
+        update();
+      }
+    }
   }
 
   Future<bool> signIn(String email, String password) async {
-    final success = await accountRepository.signIn(email, password);
+    final success = await _signInAndConnect(
+      () => accountRepository.signIn(email, password),
+    );
     if (success) {
       isLoggedIn = true;
       userName = accountRepository.displayName;
       userEmail = accountRepository.email;
+      _readAccountIdentity();
       await refreshBenefits();
       _flushInteractions();
       await refreshOrders();
@@ -350,12 +545,13 @@ class StoreController extends GetxController {
   }
 
   Future<bool> signInWithGoogle() async {
-    final success = await accountRepository.signInWithGoogle();
+    final success = await _signInAndConnect(accountRepository.signInWithGoogle);
 
     if (success) {
       isLoggedIn = true;
       userName = accountRepository.displayName;
       userEmail = accountRepository.email;
+      _readAccountIdentity();
       await refreshBenefits();
       _flushInteractions();
       await refreshOrders();
@@ -365,34 +561,141 @@ class StoreController extends GetxController {
     return success;
   }
 
+  Future<bool> signInWithKakao() => _socialSignIn('kakao');
+
+  Future<bool> signInWithNaver() => _socialSignIn('naver');
+
+  Future<bool> _socialSignIn(String provider) async {
+    final repository = accountRepository;
+    if (repository is! SocialAccountRepository) {
+      throw StateError('이 실행 환경에는 소셜 로그인이 설정되지 않았습니다.');
+    }
+    final social = repository as SocialAccountRepository;
+    final success = await _signInAndConnect(
+      provider == 'kakao' ? social.signInWithKakao : social.signInWithNaver,
+    );
+    if (success) {
+      _readAccountIdentity();
+      await refreshBenefits();
+      _flushInteractions();
+      await refreshOrders();
+      update();
+    }
+    return success;
+  }
+
+  Future<bool> _signInAndConnect(Future<bool> Function() signIn) async {
+    if (_authTransition) throw StateError('계정 변경이 진행 중입니다.');
+    _authTransition = true;
+    _accountGeneration++;
+    _shoppingGeneration++;
+    _shoppingReady = false;
+    shoppingLoading = true;
+    _clearShopping();
+    ordersLoading = false;
+    benefitsLoading = false;
+    update();
+    try {
+      final success = await signIn();
+      _readAccountIdentity();
+      if (success) accountConnectionError = null;
+      return success;
+    } catch (_) {
+      _readAccountIdentity();
+      if (isLoggedIn) {
+        accountConnectionError = '회원 정보 연결에 실패했습니다. 연결을 다시 시도해주세요.';
+      }
+      update();
+      rethrow;
+    } finally {
+      // A Firebase sign-in can succeed even if MySQL profile sync fails.
+      // Restore the actual UID's local data on success, failure, or cancel.
+      await _reloadShoppingForAccount();
+      _authTransition = false;
+      update();
+    }
+  }
+
   Future<void> signUp(
     String email,
     String password, {
     String? name,
     String? phone,
     DateTime? birthDate,
-  }) => accountRepository.signUp(
-    email,
-    password,
-    name: name,
-    phone: phone,
-    birthDate: birthDate,
-  );
+  }) async {
+    await _signInAndConnect(() async {
+      await accountRepository.signUp(
+        email,
+        password,
+        name: name,
+        phone: phone,
+        birthDate: birthDate,
+      );
+      return true;
+    });
+  }
+
+  Future<void> signUpWithEnrollment(
+    String email,
+    String password,
+    VerifiedPhone phone,
+    DateTime? birthDate, {
+    String? name,
+  }) async {
+    final repository = accountRepository;
+    if (repository is! EnrollmentAccountRepository) {
+      throw StateError('휴대폰 인증 회원가입이 설정되지 않았습니다.');
+    }
+    await _signInAndConnect(() async {
+      await (repository as EnrollmentAccountRepository).signUpWithEnrollment(
+        email,
+        password,
+        phone,
+        birthDate,
+        name: name,
+      );
+      return true;
+    });
+  }
 
   Future<void> signOut() async {
-    await accountRepository.signOut();
-
-    isLoggedIn = false;
-    userName = null;
-    userEmail = null;
-    accountBenefits = null;
-    benefitsError = null;
-    orders.clear();
-    reviews.clear();
-    inquiries.clear();
-    restockKeys.clear();
-    ordersError = null;
+    if (_authTransition) throw StateError('계정 변경이 진행 중입니다.');
+    _authTransition = true;
+    _accountGeneration++;
+    _shoppingGeneration++;
+    _shoppingReady = false;
+    shoppingLoading = true;
+    _clearShopping();
+    ordersLoading = false;
+    benefitsLoading = false;
     update();
+    try {
+      await accountRepository.signOut();
+      isLoggedIn = false;
+      userName = null;
+      userEmail = null;
+      userId = null;
+      loginProvider = null;
+      accountConnectionError = null;
+      reviewsError = null;
+      supportError = null;
+      accountBenefits = null;
+      benefitsError = null;
+      orders.clear();
+      reviews.clear();
+      inquiries.clear();
+      restockKeys.clear();
+      ordersError = null;
+      ordersLoading = false;
+      benefitsLoading = false;
+    } catch (_) {
+      _readAccountIdentity();
+      rethrow;
+    } finally {
+      await _reloadShoppingForAccount();
+      _authTransition = false;
+      update();
+    }
   }
 
   Future<StoreOrder> placeOrder(
@@ -405,6 +708,10 @@ class StoreController extends GetxController {
     int? customerCouponId,
     bool fromCart = true,
   }) async {
+    if (!_canChangeShopping) {
+      throw StateError('계정과 장바구니 정보를 불러온 뒤 다시 주문해주세요.');
+    }
+    final accountGeneration = _accountGeneration;
     final selected = List<CartItem>.of(lines ?? cart);
     final subtotal = selected.fold(0, (sum, item) => sum + item.total);
     final order = await orderRepository.createOrder(
@@ -416,6 +723,7 @@ class StoreController extends GetxController {
       paymentMethod: paymentMethod,
       customerCouponId: customerCouponId,
     );
+    if (accountGeneration != _accountGeneration) return order;
     orders.insert(0, order);
     if (fromCart) {
       final selectedKeys = selected.map((item) => item.key).toSet();
@@ -471,14 +779,26 @@ class StoreController extends GetxController {
   }
 
   Future<void> refreshSupport() async {
-    final loaded = await supportRepository.getInquiries();
-    final keys = await supportRepository.getRestockKeys();
-    inquiries
-      ..clear()
-      ..addAll(loaded);
-    restockKeys
-      ..clear()
-      ..addAll(keys);
+    if (accountConnectionError != null || _authTransition) return;
+    final generation = _accountGeneration;
+    supportError = null;
+    try {
+      final loaded = await supportRepository.getInquiries();
+      if (generation != _accountGeneration) return;
+      final keys = await supportRepository.getRestockKeys();
+      if (generation != _accountGeneration) return;
+      inquiries
+        ..clear()
+        ..addAll(loaded);
+      restockKeys
+        ..clear()
+        ..addAll(keys);
+    } catch (_) {
+      if (generation != _accountGeneration) return;
+      inquiries.clear();
+      restockKeys.clear();
+      supportError = '문의·재입고 정보를 불러오지 못했습니다. 다시 시도해주세요.';
+    }
     update();
   }
 
