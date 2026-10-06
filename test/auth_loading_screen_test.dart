@@ -207,36 +207,30 @@ Future<void> _startSignup(
   await tester.pump();
   await tester.tap(find.widgetWithText(OutlinedButton, '이메일로 가입'));
   await tester.pump();
-  await tester.enterText(
-    find.widgetWithText(TextFormField, '이름'),
-    'Synthetic member',
-  );
-  await tester.enterText(
-    find.widgetWithText(TextFormField, '전화번호'),
-    '01012345678',
-  );
-  final dropdowns = tester
-      .widgetList<DropdownButtonFormField<int>>(
-        find.byType(DropdownButtonFormField<int>),
-      )
-      .toList();
-  dropdowns[0].onChanged!(2000);
-  dropdowns[1].onChanged!(1);
-  dropdowns[2].onChanged!(2);
-  await tester.pump();
-  await tester.enterText(
-    find.widgetWithText(TextFormField, '이메일'),
-    'synthetic@example.com',
-  );
-  await tester.enterText(
-    find.widgetWithText(TextFormField, '비밀번호'),
-    'Synthetic123',
-  );
-  await tester.enterText(
-    find.widgetWithText(TextFormField, '비밀번호 확인'),
-    'Synthetic123',
-  );
-  await tester.ensureVisible(find.byType(FilledButton));
+  for (final entry in {
+    '이름': 'Synthetic User',
+    '전화번호': '01012345678',
+    '이메일': 'synthetic@example.com',
+    '비밀번호': 'Synthetic123',
+    '비밀번호 확인': 'Synthetic123',
+  }.entries) {
+    final field = find.widgetWithText(TextFormField, entry.key);
+    await tester.ensureVisible(field);
+    await tester.enterText(field, entry.value);
+    await tester.pump();
+  }
+  for (final entry in {0: 2000, 1: 1, 2: 1}.entries) {
+    tester
+        .widgetList<DropdownButtonFormField<int>>(
+          find.byType(DropdownButtonFormField<int>),
+        )
+        .elementAt(entry.key)
+        .onChanged!(entry.value);
+    await tester.pump();
+  }
+  tester.testTextInput.hide();
+  await tester.drag(find.byType(ListView), const Offset(0, -1500));
+  await tester.pumpAndSettle();
   await tester.tap(find.byType(FilledButton));
   if (pumpAfterSubmit) await tester.pump();
 }

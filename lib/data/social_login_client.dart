@@ -73,7 +73,19 @@ class NativeSocialLoginClient implements SocialLoginClient {
       if (error is TimeoutException) {
         throw StateError('카카오 로그인 시간이 초과되었습니다. 다시 시도해주세요.');
       }
-      throw StateError('카카오 로그인을 완료하지 못했습니다. 다시 시도해주세요.');
+      final code = error is kakao.KakaoAuthException
+          ? error.error.name
+          : error is kakao.KakaoClientException
+          ? error.reason.name
+          : error is PlatformException &&
+                const {
+                  'BAD_CONFIGURATION',
+                  'AUTHENTICATION_FAILED',
+                  'invalid_android_key_hash',
+                }.contains(error.code)
+          ? error.code
+          : 'unknown';
+      throw StateError('카카오 앱 키·패키지·키 해시 등록을 확인해주세요. [KAKAO:$code]');
     }
     if (accessToken == null) return null;
     if (accessToken.trim().isEmpty) {
@@ -242,19 +254,26 @@ class NativeSocialLoginClient implements SocialLoginClient {
     } catch (_) {
       throw StateError('로그인 서버에 연결하지 못했습니다. 서버 상태를 확인해주세요.');
     }
+    final provider = path.contains('/kakao') ? 'KAKAO' : 'NAVER';
+    final stage = path.endsWith('/start')
+        ? 'START'
+        : path.endsWith('/complete')
+        ? 'COMPLETE'
+        : 'TOKEN';
+    final diagnostic = '[$provider:${stage}_HTTP_${response.statusCode}]';
     // Do not surface response bodies, credentials, or provider SDK messages.
     switch (response.statusCode) {
       case 503:
         throw StateError('소셜 로그인 서버 설정을 먼저 완료해주세요.');
       case 401:
-        throw StateError('소셜 인증을 확인하지 못했습니다. 다시 로그인해주세요.');
+        throw StateError('소셜 인증을 확인하지 못했습니다. 다시 로그인해주세요. $diagnostic');
       case 409:
-        throw StateError('회원 계정 상태를 확인해주세요. 관리자에게 문의해주세요.');
+        throw StateError('회원 계정 상태를 확인해주세요. 관리자에게 문의해주세요. $diagnostic');
       case 429:
-        throw StateError('로그인 요청이 많습니다. 잠시 후 다시 시도해주세요.');
+        throw StateError('로그인 요청이 많습니다. 잠시 후 다시 시도해주세요. $diagnostic');
     }
     if (response.statusCode != 200) {
-      throw StateError('소셜 로그인을 완료하지 못했습니다. 다시 시도해주세요.');
+      throw StateError('소셜 로그인을 완료하지 못했습니다. 다시 시도해주세요. $diagnostic');
     }
     try {
       final decoded = jsonDecode(utf8.decode(response.bodyBytes));

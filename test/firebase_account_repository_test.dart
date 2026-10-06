@@ -1059,4 +1059,40 @@ void main() {
       },
     );
   }
+  for (final code in [
+    GoogleSignInExceptionCode.clientConfigurationError,
+    GoogleSignInExceptionCode.unknownError,
+  ]) {
+    test(
+      'Google non-cancel failures expose only a safe enum code: $code',
+      () async {
+        final google = _Google()
+          ..error = GoogleSignInException(
+            code: code,
+            description: 'synthetic-private-token-and-email',
+          );
+        final account = repository(
+          _Auth(),
+          MockClient((_) async => fail('No server request on native failure')),
+          google: google,
+        );
+        await expectLater(
+          account.signInWithGoogle(),
+          throwsA(
+            isA<StateError>()
+                .having(
+                  (error) => error.message,
+                  'diagnostic',
+                  contains('[GOOGLE:${code.name}]'),
+                )
+                .having(
+                  (error) => error.message,
+                  'no private details',
+                  isNot(contains('synthetic-private-token-and-email')),
+                ),
+          ),
+        );
+      },
+    );
+  }
 }

@@ -54,6 +54,14 @@ const englishDictionary = <String, String>{
   "총 결제 금액": "Total paid",
   "픽업 코드": "Pickup code",
   "반품 신청": "Request a return",
+  "반품 안내": "Return information",
+  "대리점 방문 반품 안내": "In-store return information",
+  "반품은 상품을 수령한 대리점에 방문하여 직원에게 접수해주세요. 상품과 구성품·포장을 함께 가져오세요.":
+      "To request a return, visit your pickup branch and speak to a staff member. Bring the product, accessories and packaging.",
+  "단순변심 반품은 수령 후 7일 이내이며 미착용·훼손 없음·구성품과 포장 유지 조건을 확인합니다. 구매확정된 주문은 반품할 수 없습니다.":
+      "Change-of-mind returns require a branch visit within 7 days of pickup. Items must be unworn and undamaged, with accessories and packaging intact. Confirmed purchases cannot be returned.",
+  "직원이 접수한 후 본사 검수 결과를 반품·환불 내역에서 확인할 수 있습니다.":
+      "After staff register your return, check the headquarters inspection result in your return and refund history.",
   "리뷰 작성 완료": "Review submitted",
   "결제·환불 상세는 주문 상세에서 확인해주세요.":
       "Check your order details for payment and refund information.",

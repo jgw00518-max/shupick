@@ -190,9 +190,7 @@ void main() {
       addTearDown(store.dispose);
       await store.load();
       await _showProfile(tester, store);
-      final title = provider == AccountLoginProvider.email
-          ? 'same-contact 님'
-          : '같은 표시 이름 님';
+      final title = '같은 표시 이름 님';
       expect(find.text(title), findsOneWidget);
       if (provider == AccountLoginProvider.email) {
         expect(find.byType(LoginProviderBadge), findsNothing);
@@ -341,6 +339,7 @@ void main() {
       ),
       findsOneWidget,
     );
+    expect(find.text('현재 등급'), findsOneWidget);
     expect(find.text('네회'), findsNothing);
     expect(tester.takeException(), isNull);
   });
@@ -361,6 +360,7 @@ void main() {
       ),
       findsOneWidget,
     );
+    expect(find.text('Current tier'), findsOneWidget);
     expect(find.text('CN'), findsNothing);
     expect(tester.takeException(), isNull);
   });

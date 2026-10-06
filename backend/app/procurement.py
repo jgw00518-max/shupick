@@ -86,9 +86,6 @@ def create_requisition(
         with mysql_connection() as connection:
             try:
                 with connection.cursor() as cursor:
-                    cursor.execute("SELECT branch_id FROM branches WHERE branch_id=%s", (body.branchId,))
-                    if cursor.fetchone() is None:
-                        raise HTTPException(status_code=404, detail="Branch not found")
                     variant_ids = [item.productVariantId for item in body.items]
                     placeholders = ",".join(["%s"] * len(variant_ids))
                     cursor.execute(
@@ -112,7 +109,7 @@ def create_requisition(
                           (requested_by_employee_id,branch_id,approval_workflow_id,title,reason,requisition_status)
                         VALUES (%s,%s,%s,%s,%s,'DRAFT')
                         """,
-                        (current.employee_id, body.branchId, workflow["approval_workflow_id"], body.title, body.reason),
+                        (current.employee_id, None, workflow["approval_workflow_id"], body.title, body.reason),
                     )
                     requisition_id = cursor.lastrowid
                     for item in body.items:

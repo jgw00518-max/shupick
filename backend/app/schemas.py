@@ -58,12 +58,14 @@ class PickupBranchResponse(BaseModel):
 
 class EmployeeRoleResponse(BaseModel):
     """An active business role assigned to the authenticated employee."""
+
     roleCode: str
     roleName: str
 
 
 class EmployeeBranchResponse(BaseModel):
     """An active branch with a current employee assignment."""
+
     branchId: int
     branchCode: str
     branchName: str
@@ -72,6 +74,7 @@ class EmployeeBranchResponse(BaseModel):
 
 class EmployeeProfileResponse(BaseModel):
     """Staff-app session resolved from verified Firebase identity, never client roles."""
+
     employeeId: int
     employeeCode: str
     employeeName: str
@@ -209,7 +212,6 @@ class ProcurementItemRequest(BaseModel):
 
 
 class ProcurementRequisitionCreateRequest(BaseModel):
-    branchId: int = Field(gt=0)
     title: str = Field(min_length=1, max_length=150)
     reason: str = Field(min_length=1)
     items: list[ProcurementItemRequest] = Field(min_length=1)

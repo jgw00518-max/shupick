@@ -105,7 +105,7 @@ void main() {
     await tester.ensureVisible(find.text('구매확정'));
     await tester.tap(find.text('구매확정'));
     expect(confirmed, isTrue);
-    expect(find.text('반품 신청'), findsOneWidget);
+    expect(find.text('반품 안내'), findsOneWidget);
     await pumpCard(
       tester,
       'COMPLETED',
@@ -124,7 +124,7 @@ void main() {
     expect(codeOpened, isFalse);
     expect(find.text('구매확정 완료'), findsOneWidget);
     expect(find.text('리뷰 작성 (1,000P)'), findsOneWidget);
-    expect(find.text('반품 신청'), findsNothing);
+    expect(find.text('반품 안내'), findsNothing);
     await pumpCard(tester, 'REFUNDED');
     expect(find.text('환불 완료'), findsOneWidget);
     expect(find.text('픽업 코드'), findsNothing);

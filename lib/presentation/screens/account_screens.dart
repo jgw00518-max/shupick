@@ -143,25 +143,18 @@ class ProfileScreen extends StatelessWidget {
           child: const LText('로그인 / 회원가입'),
         ),
       ] else ...[
-        Row(
+        Wrap(
+          spacing: 12,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            Flexible(
-              child: LText(
-                '${store.profileDisplayName ?? '사용자'} 님',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
+            LText(
+              '${store.userName?.trim().isNotEmpty == true ? store.userName : store.profileDisplayName ?? '고객'} 님',
+              style: Theme.of(context).textTheme.titleLarge,
             ),
             if (store.loginProvider != null &&
                 store.loginProvider != AccountLoginProvider.email)
-              Padding(
-                padding: const EdgeInsets.only(left: 8),
-                child: LoginProviderBadge(provider: store.loginProvider),
-              ),
+              LoginProviderBadge(provider: store.loginProvider),
           ],
         ),
         const SizedBox(height: 16),
@@ -289,9 +282,17 @@ class _AuthScreenState extends State<AuthScreen> {
   int? birthYear, birthMonth, birthDay;
   int get daysInBirthMonth =>
       DateTime(birthYear ?? 2000, (birthMonth ?? 1) + 1, 0).day;
+  bool get hasBirthday =>
+      birthYear != null || birthMonth != null || birthDay != null;
+  bool get needsBirthday =>
+      widget.store.accountRepository is! EnrollmentAccountRepository ||
+      hasBirthday;
+  DateTime? get selectedBirthday =>
+      birthYear == null || birthMonth == null || birthDay == null
+      ? null
+      : DateTime(birthYear!, birthMonth!, birthDay!);
   String mode = 'login';
   VerifiedPhone? _phoneProof;
-  DateTime? _birthDate;
   bool busy = false;
   String loadingTitle = '로그인 중…';
   String loadingDescription = '인증과 회원 정보를 확인하고 있어요.';
@@ -316,7 +317,6 @@ class _AuthScreenState extends State<AuthScreen> {
     password.clear();
     confirm.clear();
     _phoneProof = null;
-    _birthDate = null;
     setState(() => mode = value);
   }
 
@@ -355,8 +355,8 @@ class _AuthScreenState extends State<AuthScreen> {
             email.text.trim(),
             password.text,
             phone,
-            _birthDate,
-            name: name.text.trim().isEmpty ? null : name.text.trim(),
+            selectedBirthday,
+            name: name.text.trim(),
           );
         } else {
           await widget.store.signUp(
@@ -364,7 +364,7 @@ class _AuthScreenState extends State<AuthScreen> {
             password.text,
             name: name.text.trim(),
             phone: phone.text.replaceAll(RegExp(r'[^0-9]'), ''),
-            birthDate: DateTime(birthYear!, birthMonth!, birthDay!),
+            birthDate: selectedBirthday,
           );
         }
         if (!mounted) return;
@@ -518,9 +518,7 @@ class _AuthScreenState extends State<AuthScreen> {
           key: formKey,
           child: Column(
             children: [
-              if (mode == 'signupEmail' &&
-                  widget.store.accountRepository
-                      is! EnrollmentAccountRepository) ...[
+              if (mode == 'signupEmail') ...[
                 TextFormField(
                   controller: name,
                   textInputAction: TextInputAction.next,
@@ -536,33 +534,38 @@ class _AuthScreenState extends State<AuthScreen> {
                       : null,
                 ),
                 const SizedBox(height: 16),
-                TextFormField(
-                  controller: phone,
-                  keyboardType: TextInputType.phone,
-                  textInputAction: TextInputAction.next,
-                  autofillHints: const [AutofillHints.telephoneNumber],
-                  decoration: const InputDecoration(
-                    labelText: '전화번호',
-                    hintText: '010-1234-5678',
-                    border: OutlineInputBorder(),
+                if (widget.store.accountRepository
+                    is! EnrollmentAccountRepository)
+                  TextFormField(
+                    controller: phone,
+                    keyboardType: TextInputType.phone,
+                    textInputAction: TextInputAction.next,
+                    autofillHints: const [AutofillHints.telephoneNumber],
+                    decoration: const InputDecoration(
+                      labelText: '전화번호',
+                      border: OutlineInputBorder(),
+                      hintText: '010-1234-5678',
+                    ),
+                    validator: (value) {
+                      final digits = (value ?? '').replaceAll(
+                        RegExp(r'[^0-9]'),
+                        '',
+                      );
+                      return digits.length >= 9 &&
+                              digits.length <= 15 &&
+                              RegExp(r'^[+0-9()\s-]+$').hasMatch(value ?? '')
+                          ? null
+                          : '올바른 전화번호를 입력해주세요.';
+                    },
                   ),
-                  validator: (value) {
-                    final digits = (value ?? '').replaceAll(
-                      RegExp(r'[^0-9]'),
-                      '',
-                    );
-                    return digits.length >= 9 &&
-                            digits.length <= 15 &&
-                            RegExp(r'^[+0-9()\s-]+$').hasMatch(value ?? '')
-                        ? null
-                        : '올바른 전화번호를 입력해주세요.';
-                  },
-                ),
                 const SizedBox(height: 20),
                 Align(
                   alignment: Alignment.centerLeft,
                   child: LText(
-                    '생년월일',
+                    widget.store.accountRepository
+                            is EnrollmentAccountRepository
+                        ? '생년월일 (선택)'
+                        : '생년월일',
                     style: Theme.of(context).textTheme.titleSmall,
                   ),
                 ),
@@ -585,7 +588,8 @@ class _AuthScreenState extends State<AuthScreen> {
                             birthDay = null;
                           }
                         }),
-                  validator: (value) => value == null ? '출생 연도를 선택해주세요.' : null,
+                  validator: (value) =>
+                      value == null && needsBirthday ? '출생 연도를 선택해주세요.' : null,
                 ),
                 const SizedBox(height: 16),
                 Row(
@@ -613,8 +617,9 @@ class _AuthScreenState extends State<AuthScreen> {
                                   birthDay = null;
                                 }
                               }),
-                        validator: (value) =>
-                            value == null ? '월을 선택해주세요.' : null,
+                        validator: (value) => value == null && needsBirthday
+                            ? '월을 선택해주세요.'
+                            : null,
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -632,7 +637,9 @@ class _AuthScreenState extends State<AuthScreen> {
                             ? null
                             : (day) => setState(() => birthDay = day),
                         validator: (value) {
-                          if (value == null) return '일을 선택해주세요.';
+                          if (value == null) {
+                            return needsBirthday ? '일을 선택해주세요.' : null;
+                          }
                           if (birthYear != null &&
                               birthMonth != null &&
                               DateTime(
@@ -710,28 +717,10 @@ class _AuthScreenState extends State<AuthScreen> {
                 if (widget.store.accountRepository
                     is EnrollmentAccountRepository) ...[
                   const SizedBox(height: 16),
-                  TextFormField(
-                    controller: name,
-                    textInputAction: TextInputAction.next,
-                    autofillHints: const [AutofillHints.name],
-                    decoration: const InputDecoration(
-                      labelText: '이름 (선택)',
-                      border: OutlineInputBorder(),
-                    ),
-                    validator: (value) => (value?.trim().length ?? 0) > 100
-                        ? '이름은 100자 이내로 입력해주세요.'
-                        : null,
-                  ),
-                  const SizedBox(height: 24),
                   PhoneEnrollmentFields(
                     initialProof: _phoneProof,
                     verifier: widget.phoneVerifier,
                     onChanged: (value) => _phoneProof = value,
-                  ),
-                  const SizedBox(height: 20),
-                  BirthdayEnrollmentField(
-                    value: _birthDate,
-                    onChanged: (value) => setState(() => _birthDate = value),
                   ),
                 ],
               ],

@@ -341,7 +341,7 @@ def get_my_profile(current: CurrentCustomer = Depends(get_current_customer)) -> 
 def get_employee_profile(
     current: CurrentEmployee = Depends(get_current_employee),
 ) -> EmployeeProfileResponse:
-    """Return active roles and current branch assignments for the signed-in employee."""
+    """Return only active roles and current branch assignments for this employee."""
 
     try:
         with mysql_connection() as connection:
@@ -373,7 +373,10 @@ def get_employee_profile(
         employeeId=current.employee_id,
         employeeCode=current.employee_code,
         employeeName=current.employee_name,
-        roles=[{"roleCode": row["role_code"], "roleName": row["role_name"]} for row in roles],
+        roles=[
+            {"roleCode": row["role_code"], "roleName": row["role_name"]}
+            for row in roles
+        ],
         branches=[
             {
                 "branchId": int(row["branch_id"]),

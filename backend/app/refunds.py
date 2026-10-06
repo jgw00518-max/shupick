@@ -203,6 +203,7 @@ def create_refund(request: RefundCreateRequest, _: CurrentEmployee = Depends(req
                             int(existing["payment_id"]) == request.paymentId
                             and str(existing["refund_type"]) == request.refundType
                             and int(existing["refund_amount"]) == request.refundAmount
+                            and existing.get("return_request_id") == request.returnRequestId
                         )
                         if not same_request:
                             raise HTTPException(status_code=409, detail="Idempotency key was used for another refund")

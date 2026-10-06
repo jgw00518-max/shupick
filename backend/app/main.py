@@ -9,6 +9,8 @@ from .staff_orders import router as staff_orders_router
 from .customer_enrollment import router as enrollment_router
 from .social_auth import router as social_auth_router, install_social_auth_access_log_filter
 from .staff_work import router as staff_work_router
+from .staff_returns import router as staff_returns_router
+from .staff_refunds import router as staff_refunds_router
 from .branches import router as branches_router
 from .checkout_benefits import router as benefits_router
 from .database import mysql_connection
@@ -38,6 +40,8 @@ app.include_router(staff_orders_router)
 app.include_router(enrollment_router)
 app.include_router(social_auth_router)
 app.include_router(staff_work_router)
+app.include_router(staff_returns_router)
+app.include_router(staff_refunds_router)
 app.include_router(branches_router)
 app.include_router(benefits_router)
 app.include_router(products_router)

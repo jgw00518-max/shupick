@@ -53,7 +53,7 @@ class _Enrollment extends MockAccountRepository
   VerifiedPhone? savedProof;
   DateTime? savedBirthday;
   int enrollSignups = 0;
-  String? signupName;
+  String? savedName;
 
   @override
   Future<EnrollmentProfile> getEnrollmentProfile() async => profile;
@@ -73,7 +73,7 @@ class _Enrollment extends MockAccountRepository
     String? name,
   }) async {
     enrollSignups++;
-    signupName = name;
+    savedName = name;
   }
 }
 
@@ -117,15 +117,25 @@ void main() {
       final fields = find.byType(TextFormField);
       expect(fields, findsNWidgets(5));
       expect(find.text('생년월일 (선택)'), findsOneWidget);
-      await tester.enterText(fields.at(0), 'synthetic@example.com');
-      await tester.enterText(fields.at(1), 'synthetic-password123');
-      await tester.enterText(fields.at(2), 'synthetic-password123');
-      await tester.enterText(fields.at(3), 'Synthetic member');
+      await tester.enterText(fields.at(0), 'Synthetic User');
+      await tester.enterText(fields.at(1), 'synthetic@example.com');
+      await tester.enterText(
+        find.widgetWithText(TextFormField, '비밀번호'),
+        'synthetic-password123',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, '비밀번호 확인'),
+        'synthetic-password123',
+      );
+
       await tester.enterText(fields.at(4), '01012345678');
+      await tester.drag(find.byType(ListView).first, const Offset(0, -2000));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('가입하기'));
       await tester.pump();
       expect(account.enrollSignups, 0);
       expect(find.text('휴대폰 문자 인증을 완료해주세요.'), findsOneWidget);
+      await tester.ensureVisible(find.byType(CheckboxListTile));
       await tester.tap(find.byType(CheckboxListTile));
       await tester.pump();
       await tester.tap(find.text('문자 인증번호 받기'));
@@ -134,10 +144,12 @@ void main() {
         VerifiedPhone(number: '+821012345678', idToken: 'synthetic-proof'),
       );
       await tester.pump();
+      await tester.drag(find.byType(ListView).first, const Offset(0, -2000));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('가입하기'));
       await tester.pumpAndSettle();
       expect(account.enrollSignups, 1);
-      expect(account.signupName, 'Synthetic member');
+      expect(account.savedName, 'Synthetic User');
       expect(messages, contains('회원가입이 완료되었습니다. 입력한 계정으로 로그인해주세요.'));
       expect(find.byType(PhoneEnrollmentFields), findsNothing);
       await tester.pumpWidget(const SizedBox());
@@ -277,6 +289,7 @@ void main() {
       await tester.pump(const Duration(minutes: 5));
       expect(proof, isNull);
       expect(find.text('휴대폰 인증 후 5분이 지났습니다. 다시 인증해주세요.'), findsOneWidget);
+      await tester.ensureVisible(find.byType(CheckboxListTile));
       await tester.tap(find.byType(CheckboxListTile));
       await tester.pump();
       expect(

@@ -221,6 +221,28 @@ class FirebaseAccountRepository
       'Authorization': 'Bearer $token',
       'Content-Type': 'application/json; charset=utf-8',
     };
+    if (customerName != null || phone != null || birthDate != null) {
+      final saved = await _client
+          .post(
+            Uri.parse('$_baseUrl/auth/customer/sync'),
+            headers: headers,
+            body: jsonEncode({
+              'customerName':
+                  customerName ??
+                  user.displayName ??
+                  email?.split('@').first ??
+                  '고객',
+              'phone': ?phone,
+              if (birthDate != null)
+                'birthDate': birthDate.toIso8601String().split('T').first,
+            }),
+          )
+          .timeout(const Duration(seconds: 10));
+      if (saved.statusCode != 200) {
+        throw StateError('MySQL 회원 정보 연결에 실패했습니다. (${saved.statusCode})');
+      }
+      return;
+    }
     // 이미 연결된 고객은 조회만 합니다. 앱 시작 때 프로필을 덮어쓰지 않습니다.
     final profile = await _client
         .get(Uri.parse('$_baseUrl/auth/me'), headers: headers)
@@ -294,10 +316,10 @@ class FirebaseAccountRepository
         email: email,
         password: password,
       );
+      _rememberLoginProvider(AccountLoginProvider.email);
       if (name?.trim().isNotEmpty == true) {
         await _auth.currentUser?.updateDisplayName(name!.trim());
       }
-      _rememberLoginProvider(AccountLoginProvider.email);
       await _syncCustomerProfile(
         customerName: name?.trim().isNotEmpty == true ? name!.trim() : null,
         phone: phone,
@@ -342,10 +364,30 @@ class FirebaseAccountRepository
       await _syncCustomerProfile();
 
       return true;
-    } on GoogleSignInException {
-      return false;
-    } on FirebaseAuthException {
-      return false;
+    } on GoogleSignInException catch (error) {
+      if (error.code == GoogleSignInExceptionCode.canceled) return false;
+      final guidance =
+          {
+            GoogleSignInExceptionCode.clientConfigurationError,
+            GoogleSignInExceptionCode.providerConfigurationError,
+          }.contains(error.code)
+          ? 'Firebase의 Google 로그인과 Android SHA 등록을 확인해주세요.'
+          : 'Google 인증을 완료하지 못했습니다. 네트워크와 Google 계정을 확인해주세요.';
+      throw StateError('$guidance [GOOGLE:${error.code.name}]');
+    } on FirebaseAuthException catch (error) {
+      const known = {
+        'operation-not-allowed',
+        'invalid-credential',
+        'account-exists-with-different-credential',
+        'user-disabled',
+        'network-request-failed',
+        'invalid-api-key',
+        'app-not-authorized',
+      };
+      final code = known.contains(error.code) ? error.code : 'unknown';
+      throw StateError(
+        'Firebase Google 인증 설정을 확인해주세요. [GOOGLE_FIREBASE:$code]',
+      );
     } on StateError {
       rethrow;
     } catch (_) {
