@@ -3,6 +3,7 @@
 신발을 주문하고 선택한 대리점에서 수령하는 Flutter 시연 프로젝트입니다. 고객 앱은 FastAPI를 통해 MySQL에 접근하며 SQLite는 기기 안의 설정과 쇼핑 기록을 저장합니다. 직원 앱에서도 사용할 수 있도록 공통 백엔드의 직원 인증·업무 API를 추가했습니다. 이 저장소의 `lib/`는 고객 앱이며 직원 앱 화면 전체가 이 저장소에 구현된 것은 아닙니다.
 
 결제·환불은 실제 결제대행사와 연결하지 않은 데모입니다. 마이그레이션에 포함된 대리점 주소·전화번호·좌표는 테스트 데이터이므로 실제 매장 정보로 사용하면 안 됩니다.
+휴대폰 문자 인증·선택 생년월일 등록 구현과 Firebase 설정/비용 확인 절차는 [PHONE_ENROLLMENT.md](docs/PHONE_ENROLLMENT.md)에 정리했습니다. 실제 SMS 발송 검증과 생일쿠폰 자동 발급은 아직 완료하지 않았습니다.
 
 ## 지금까지 반영한 변경사항
 
@@ -11,7 +12,7 @@
 - 앱 화면의 브랜드 문구를 SHOEPICK으로 변경하고 [참고 목업](https://sole-select.higgsfield.app/)에 맞춰 상품 상세 화면을 구성했습니다.
 - 상품 목록·상세·구매 화면의 글자 크기를 조정해 가독성과 줄바꿈을 개선했습니다.
 - 비회원 상품 탐색, 성별·분류·브랜드 필터, 정렬, 검색, 최근 본 상품, 찜, 장바구니, 색상·사이즈·수량 선택을 구현했습니다.
-- SQLite로 언어·다크 모드·알림 설정, 장바구니·찜·최근 조회·검색 기록과 상품 캐시를 저장합니다.
+- SQLite로 언어·다크 모드·알림 설정, 장바구니·찜·최근 조회·검색 기록과 상품 캐시를 저장합니다. 장바구니·찜·최근 조회는 Firebase UID별로 분리하고 비회원은 별도 공간을 사용합니다.
 - 상품 API 연결 실패 시 저장된 캐시를 이용합니다. 주문 가능 여부를 결정하는 옵션 재고는 API에서 조회합니다.
 - 로그인 계정의 리뷰·문의 조회 실패가 상품 화면 전체를 막던 문제를 수정했습니다. 초기 로딩에서 이미 refreshOrders()가 처리하는 리뷰·문의 요청을 중복 실행하지 않도록 했습니다.
 - Android 개발 빌드에 로컬 HTTP 연결 허용 설정을 추가했습니다.
@@ -60,7 +61,7 @@
 | docs/integration_verification.md | 기존 시연·DB 검증 기록 |
 
 - **MySQL shupick_v2**: 고객·직원·상품·재고·주문·결제·수령·반품·환불·리뷰·쿠폰·포인트의 서버 원본입니다. Firebase UID와 업무 프로필을 연결하며 비밀번호는 Firebase Authentication에서 관리합니다.
-- **SQLite shupick.sqlite**: app_settings, cached_products, cached_product_options, recent_searches, product_views, favorites, cart_items를 정의합니다. catalog_metadata_cache, interaction_queue는 필요할 때 추가 생성합니다. 현재 로컬 쇼핑 저장소의 기본 owner_key는 guest이며 MySQL의 장바구니 테이블과 자동 동기화되지 않습니다.
+- **SQLite shupick.sqlite**: app_settings, cached_products, cached_product_options, recent_searches, product_views, favorites, cart_items를 정의합니다. catalog_metadata_cache, interaction_queue는 필요할 때 추가 생성합니다. 로컬 쇼핑 기록의 owner_key는 로그인한 Firebase UID 또는 비회원 guest이며 MySQL의 장바구니 테이블과 자동 동기화되지 않습니다.
 - **Firebase**: 고객·직원 로그인 인증과 Firestore 상태 전달을 담당합니다. MySQL outbox_events를 orderStatuses, fulfillmentStatuses, pickupStatuses, inventoryStatuses 문서로 전달하는 코드가 있습니다. 실제 Firestore 전송·보안 규칙 배포·앱 수신 검증은 별도 작업입니다.
 
 ## 확정된 거래 정책
@@ -90,6 +91,8 @@
 | 022_staff_registration.sql | 직원 이메일과 가입용 직책 |
 | 023_remove_staff_registration_approval.sql | 이전 테스트 승인 대기 테이블 제거; 기존 요청 유무 확인 필요 |
 | 024_branch_manager_pickup_permission.sql | 대리점장 픽업 처리 권한 |
+| 025_social_customer_email_optional.sql | 이메일 없는 소셜 고객 지원 |
+| 026_customer_enrollment.sql | 인증된 휴대폰·선택 생년월일과 동의 기록 |
 
 020은 001~017 적용을 전제로 하며 018·019의 관련 데이터를 포함합니다. 따라서 018·019를 미리 실행하는 것이 필수는 아닙니다. 022는 컬럼 추가를 포함하므로 재실행 전에 적용 여부를 확인하세요. Firebase UID를 포함한 SQL은 Firebase Authentication 계정을 생성하지 않습니다. 실제 로그인은 같은 Firebase 프로젝트의 계정 UID와 MySQL 값이 일치해야 합니다.
 

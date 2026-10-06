@@ -50,11 +50,13 @@ class PickupBranchResponse(BaseModel):
 
 
 class EmployeeRoleResponse(BaseModel):
+    """An active business role assigned to the authenticated employee."""
     roleCode: str
     roleName: str
 
 
 class EmployeeBranchResponse(BaseModel):
+    """An active branch with a current employee assignment."""
     branchId: int
     branchCode: str
     branchName: str
@@ -62,6 +64,7 @@ class EmployeeBranchResponse(BaseModel):
 
 
 class EmployeeProfileResponse(BaseModel):
+    """Staff-app session resolved from verified Firebase identity, never client roles."""
     employeeId: int
     employeeCode: str
     employeeName: str
@@ -179,6 +182,7 @@ class CustomerProfileSyncRequest(BaseModel):
     customerName: str = Field(min_length=1, max_length=100)
     phone: str | None = Field(default=None, max_length=20)
     birthDate: date | None = None
+    ensureOnly: bool = False
 
 
 class CustomerProfileResponse(BaseModel):
@@ -186,7 +190,7 @@ class CustomerProfileResponse(BaseModel):
 
     customerId: int
     firebaseUid: str
-    email: str
+    email: str | None
     customerName: str
     phone: str | None
     birthDate: str | None

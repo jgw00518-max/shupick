@@ -200,14 +200,14 @@ def staff_customer_detail(customer_id: int, _: CurrentEmployee = Depends(require
                     """SELECT o.order_id,o.order_number,o.order_status,o.paid_total,
                               o.ordered_at,b.branch_name
                        FROM orders o LEFT JOIN branches b ON b.branch_id=o.pickup_branch_id
-                       WHERE o.customer_id=%s ORDER BY o.ordered_at DESC LIMIT 50""",
+                       WHERE o.customer_id=%s ORDER BY o.ordered_at DESC,o.order_id DESC LIMIT 50""",
                     (customer_id,),
                 )
                 orders = cursor.fetchall()
                 cursor.execute(
                     """SELECT rr.return_request_id,rr.order_id,rr.request_status,rr.return_reason
                        FROM return_requests rr WHERE rr.customer_id=%s
-                       ORDER BY rr.requested_at DESC LIMIT 50""",
+                       ORDER BY rr.requested_at DESC,rr.return_request_id DESC LIMIT 50""",
                     (customer_id,),
                 )
                 returns = cursor.fetchall()

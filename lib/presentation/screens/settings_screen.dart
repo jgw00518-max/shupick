@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../localization.dart';
 
 import '../shared/store_widgets.dart';
+import '../../domain/customer_enrollment.dart';
+import 'member_enrollment_screen.dart';
 
 /// 화면·언어·알림 목업 설정을 사용자에게 노출합니다.
 class SettingsScreen extends StatefulWidget {
@@ -13,6 +15,7 @@ class SettingsScreen extends StatefulWidget {
     required this.onDarkChanged,
     required this.onLanguageChanged,
     required this.onPushChanged,
+    this.enrollmentRepository,
   });
   final bool dark;
   final String language;
@@ -20,6 +23,7 @@ class SettingsScreen extends StatefulWidget {
   final ValueChanged<bool> onDarkChanged;
   final ValueChanged<String> onLanguageChanged;
   final ValueChanged<bool> onPushChanged;
+  final EnrollmentAccountRepository? enrollmentRepository;
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
@@ -32,6 +36,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
       const SectionTitle('설정'),
       const LText('SHOEPICK을 내 방식으로 사용하세요.'),
       const SizedBox(height: 20),
+      if (widget.enrollmentRepository != null) ...[
+        const SectionTitle('회원 정보'),
+        ListTile(
+          leading: const Icon(Icons.person_outline),
+          title: const LText('휴대폰 인증·생일 등록'),
+          subtitle: const LText('복구용 번호 인증과 선택 생일 정보 등록'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute<void>(
+              builder: (_) => MemberEnrollmentScreen(
+                repository: widget.enrollmentRepository!,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+      ],
       const SectionTitle('화면'),
       SwitchListTile(
         title: const LText('다크 테마'),

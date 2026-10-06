@@ -504,6 +504,7 @@ class _ProductCollectionScreenState extends State<ProductCollectionScreen> {
   GlobalKey<SliverAnimatedListState> _listKey =
       GlobalKey<SliverAnimatedListState>();
   late List<Product> _products;
+  String? _accountKey;
   int _removing = 0;
   int _generation = 0;
   static const _duration = Duration(milliseconds: 300);
@@ -512,13 +513,17 @@ class _ProductCollectionScreenState extends State<ProductCollectionScreen> {
   void initState() {
     super.initState();
     _products = List.of(widget.products);
+    _accountKey = widget.store.accountIdentityKey;
   }
 
   @override
   void didUpdateWidget(ProductCollectionScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.title != widget.title ||
-        oldWidget.canRemove != widget.canRemove) {
+        oldWidget.canRemove != widget.canRemove ||
+        _accountKey != widget.store.accountIdentityKey ||
+        !widget.store.shoppingReady) {
+      _accountKey = widget.store.accountIdentityKey;
       _generation++;
       _removing = 0;
       _products = List.of(widget.products);
@@ -584,7 +589,7 @@ class _ProductCollectionScreenState extends State<ProductCollectionScreen> {
             child: CollectionProductCard(
               product: product,
               onOpen: () => widget.onOpen(product),
-              onRemove: widget.canRemove
+              onRemove: widget.canRemove && widget.store.shoppingReady
                   ? () => widget.store.toggleWish(product)
                   : null,
             ),

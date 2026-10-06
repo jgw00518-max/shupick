@@ -41,7 +41,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   bool reviewsLoading = false;
   String? reviewsError;
   Map<int, ProductReview> ownedPublicReviews = {};
-  String? ownedReviewEmail;
+  String? ownedReviewIdentity;
 
   /// 공개 목록과 집계는 동일 서버 응답을 사용하여 내 리뷰를 이중 계산하지 않습니다.
   Future<void> loadPublicReviews({bool more = false}) async {
@@ -60,13 +60,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         offset: previous.length,
       );
       // 공개 응답은 익명으로 유지하고, 인증된 내 리뷰 ID와 로컬에서만 연결합니다.
-      final email = widget.store.userEmail;
+      final identity = widget.store.accountIdentityKey;
       final owned = widget.store.isLoggedIn
           ? await repository.getReviews()
           : <ProductReview>[];
       if (!mounted) return;
       setState(() {
-        ownedReviewEmail = email;
+        ownedReviewIdentity = identity;
         ownedPublicReviews = {
           for (final review in owned)
             if (review.id != null) review.id!: review,
@@ -257,6 +257,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           store: widget.store,
           initialColor: color,
           onCart: (lines) {
+            if (!widget.store.shoppingReady) {
+              widget.onMessage(
+                widget.store.shoppingError ?? '계정과 장바구니 정보를 불러온 뒤 다시 시도해주세요.',
+              );
+              return;
+            }
             widget.store.addCartItems(lines);
             widget.onMessage('장바구니에 상품을 담았어요.');
           },
@@ -294,7 +300,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     top: 18,
                     child: IconButton(
                       tooltip: '찜',
-                      onPressed: () => widget.store.toggleWish(widget.product),
+                      onPressed: widget.store.shoppingReady
+                          ? () => widget.store.toggleWish(widget.product)
+                          : null,
                       icon: Icon(
                         widget.store.wishedIds.contains(widget.product.id)
                             ? Icons.favorite
@@ -753,7 +761,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           onMore: () => loadPublicReviews(more: true),
           ownedReviews:
               widget.store.isLoggedIn &&
-                  ownedReviewEmail == widget.store.userEmail
+                  ownedReviewIdentity == widget.store.accountIdentityKey
               ? ownedPublicReviews
               : const {},
           onEdit: _editReview,
@@ -1149,6 +1157,12 @@ class _ProductOptionsSheetState extends State<ProductOptionsSheet> {
       setState(() => error = '색상과 사이즈를 선택해 옵션을 추가해주세요.');
       return;
     }
+    if (!widget.store.shoppingReady) {
+      setState(() {
+        error = widget.store.shoppingError ?? '계정과 장바구니 정보를 불러온 뒤 다시 시도해주세요.';
+      });
+      return;
+    }
     Navigator.pop(context);
     if (buy) {
       widget.onBuy(List.of(selected));
@@ -1212,29 +1226,36 @@ class _ProductOptionsSheetState extends State<ProductOptionsSheet> {
                   ),
                 ),
                 const SizedBox(width: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    LText(
-                      widget.product.name,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      LText(
+                        widget.product.name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
-                    ),
-                    LText(
-                      widget.product.category,
-                      style: const TextStyle(fontSize: 15, color: Colors.grey),
-                    ),
-                    const SizedBox(height: 6),
-                    LText(
-                      won(widget.product.price),
-                      style: const TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w700,
+                      LText(
+                        widget.product.category,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          color: Colors.grey,
+                        ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 6),
+                      LText(
+                        won(widget.product.price),
+                        style: const TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),

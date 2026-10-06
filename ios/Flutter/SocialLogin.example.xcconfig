@@ -1,0 +1,2 @@
+// Copy to SocialLogin.local.xcconfig and set the same native app key as Dart.
+KAKAO_NATIVE_APP_KEY=YOUR_NATIVE_APP_KEY

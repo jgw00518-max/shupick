@@ -412,3 +412,7 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Social provider configuration is local to each developer.
+social-login.local.json
+ios/Flutter/SocialLogin.local.xcconfig

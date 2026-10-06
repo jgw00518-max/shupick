@@ -85,6 +85,7 @@ void main() {
 
   testWidgets('장바구니 245 사이즈와 중복 서버 옵션이 있어도 예외가 발생하지 않는다', (tester) async {
     final store = storeWith(client());
+    await store.load();
     store.cart.add(const CartItem(product: shoe, size: '245', color: '화이트'));
     await pump(
       tester,

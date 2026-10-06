@@ -1148,12 +1148,16 @@ class OrdersScreen extends StatelessWidget {
               ),
             ),
           if (!store.ordersLoading &&
+              store.accountConnectionError == null &&
               store.ordersError == null &&
               store.orders.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 40),
-              child: EmptyState('주문 내역이 없습니다. 로그인 후 주문을 확인해주세요.'),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 40),
+              child: EmptyState(
+                store.isLoggedIn ? '아직 주문한 내역이 없습니다.' : '로그인 후 주문 내역을 확인해주세요.',
+              ),
             ),
+          if (store.reviewsError != null) LText(store.reviewsError!),
           for (final order in store.orders)
             OrderHistoryCard(
               order: order,

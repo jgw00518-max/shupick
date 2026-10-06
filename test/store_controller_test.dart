@@ -39,7 +39,8 @@ void main() {
 
     expect(store.loadError, isNull);
     expect(store.products, isNotEmpty);
-    expect(store.ordersError, isNotNull);
+    expect(store.ordersError, isNull);
+    expect(store.reviewsError, isNotNull);
     store.dispose();
   });
 
