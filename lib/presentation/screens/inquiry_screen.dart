@@ -43,6 +43,7 @@ class _InquiryScreenState extends State<InquiryScreen> {
   final title = TextEditingController();
   final body = TextEditingController();
   late String kind;
+  bool submitting = false;
   @override
   void initState() {
     super.initState();
@@ -59,10 +60,23 @@ class _InquiryScreenState extends State<InquiryScreen> {
 
   Future<void> _submit() async {
     if (!formKey.currentState!.validate()) return;
-    await widget.store.addInquiry(kind, title.text.trim(), body.text.trim());
-    title.clear();
-    body.clear();
-    widget.onMessage('문의가 접수되었습니다. 답변 등록 시 알려드릴게요.');
+    setState(() => submitting = true);
+    try {
+      await widget.store.addInquiry(
+        kind,
+        title.text.trim(),
+        body.text.trim(),
+        productId: widget.product?.id,
+      );
+      if (!mounted) return;
+      title.clear();
+      body.clear();
+      widget.onMessage('문의가 접수되었습니다. 문의 목록에서 답변을 확인해주세요.');
+    } catch (_) {
+      if (mounted) widget.onMessage('문의 접수에 실패했습니다. 로그인과 연결 상태를 확인해주세요.');
+    } finally {
+      if (mounted) setState(() => submitting = false);
+    }
   }
 
   void _openEntry(InquiryEntry entry) => showDialog<void>(
@@ -98,6 +112,13 @@ class _InquiryScreenState extends State<InquiryScreen> {
     padding: const EdgeInsets.all(20),
     children: [
       const SectionTitle('문의 사항'),
+      if (widget.store.supportError != null) ...[
+        LText(widget.store.supportError!),
+        TextButton(
+          onPressed: widget.store.refreshSupport,
+          child: const LText('문의 다시 시도'),
+        ),
+      ],
       LText(
         widget.product == null
             ? '궁금한 점을 남기면 빠르게 답변해드려요.'
@@ -119,6 +140,7 @@ class _InquiryScreenState extends State<InquiryScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SectionTitle('1:1 문의'),
+            const SizedBox(height: 16),
             DropdownButtonFormField<String>(
               initialValue: kind,
               decoration: const InputDecoration(
@@ -169,7 +191,7 @@ class _InquiryScreenState extends State<InquiryScreen> {
             SizedBox(
               width: double.infinity,
               child: FilledButton(
-                onPressed: _submit,
+                onPressed: submitting ? null : _submit,
                 child: const LText('문의 접수'),
               ),
             ),
@@ -178,6 +200,16 @@ class _InquiryScreenState extends State<InquiryScreen> {
       ),
       const SizedBox(height: 24),
       SectionTitle('문의 목록 · ${widget.store.inquiries.length}건'),
+      TextButton(
+        onPressed: () async {
+          try {
+            await widget.store.refreshSupport();
+          } catch (_) {
+            if (mounted) widget.onMessage('문의 목록을 불러오지 못했습니다.');
+          }
+        },
+        child: const LText('새로고침'),
+      ),
       for (final entry in widget.store.inquiries)
         ListTile(
           title: LText(entry.title),

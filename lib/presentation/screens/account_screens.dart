@@ -2,8 +2,12 @@ import 'package:flutter/material.dart';
 import '../localization.dart';
 
 import '../../app/store_controller.dart';
+import '../../domain/repositories.dart';
+import '../../domain/customer_enrollment.dart';
 import '../store_shell.dart';
+import '../shared/login_provider_badge.dart';
 import '../shared/store_widgets.dart';
+import '../shared/phone_enrollment_fields.dart';
 
 /// 비회원은 홈을 둘러보고 마이페이지에서 로그인할 수 있습니다.
 class ProfileScreen extends StatelessWidget {
@@ -16,6 +20,113 @@ class ProfileScreen extends StatelessWidget {
   final StoreController store;
   final void Function(StorePage) onGo;
   final VoidCallback onLogout;
+  Widget _membershipCard(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final membership = store.accountBenefits?['membership'] as Map?;
+    final rawAmount = membership?['net_purchase_amount'];
+    final amount = rawAmount is num
+        ? rawAmount.toInt()
+        : int.tryParse('$rawAmount');
+    return Container(
+      key: const ValueKey('membership-benefits'),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        border: Border.all(color: scheme.outlineVariant),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          LText('회원 혜택', style: theme.textTheme.titleMedium),
+          const SizedBox(height: 12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(11),
+                decoration: BoxDecoration(
+                  color: scheme.primary.withValues(alpha: .09),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.workspace_premium_outlined,
+                  color: scheme.primary,
+                  size: 26,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    LText(
+                      '현재 등급',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    LText(
+                      '${membership?['tier_name'] ?? '등급 산정 대기'}',
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        color: scheme.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                tooltip: translateMockupText(
+                  '회원 혜택 새로고침',
+                  LocaleScope.languageOf(context),
+                ),
+                onPressed: store.benefitsLoading ? null : store.refreshBenefits,
+                icon: const Icon(Icons.refresh, size: 22),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Divider(height: 1, color: scheme.outlineVariant),
+          const SizedBox(height: 18),
+          LText(
+            '등급 산정 구매확정 금액',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 6),
+          LText(
+            amount == null ? '—' : won(amount),
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 12),
+          LText(
+            '등급은 매월 산정되며 당월 말일까지 유지됩니다.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
+          if (store.benefitsLoading) ...[
+            const SizedBox(height: 16),
+            const LinearProgressIndicator(),
+          ],
+          if (store.benefitsError != null) ...[
+            const SizedBox(height: 12),
+            LText(
+              store.benefitsError!,
+              style: theme.textTheme.bodySmall?.copyWith(color: scheme.error),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) => ListView(
     padding: const EdgeInsets.all(20),
@@ -32,49 +143,61 @@ class ProfileScreen extends StatelessWidget {
           child: const LText('로그인 / 회원가입'),
         ),
       ] else ...[
-        SectionTitle('${store.userName ?? '사용자'} 님'),
-        const LText('PLATINUM MEMBER · 다음 VIP까지 128,000원'),
-        const SizedBox(height: 16),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                LText(
-                  (store.userName ?? 'U')
-                      .trim()
-                      .split(RegExp(r'\s+'))
-                      .where((word) => word.isNotEmpty)
-                      .map((word) => word[0].toUpperCase())
-                      .take(2)
-                      .join(),
-                ),
-                LText('VIP 등급 78%'),
-                LText('PLATINUM'),
-              ],
+        Wrap(
+          spacing: 12,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            LText(
+              '${store.userName?.trim().isNotEmpty == true ? store.userName : store.profileDisplayName ?? '고객'} 님',
+              style: Theme.of(context).textTheme.titleLarge,
             ),
-          ),
+            if (store.loginProvider != null &&
+                store.loginProvider != AccountLoginProvider.email)
+              LoginProviderBadge(provider: store.loginProvider),
+          ],
         ),
+        const SizedBox(height: 16),
+        _membershipCard(context),
+        const SizedBox(height: 12),
         Row(
           children: [
             Expanded(
               child: TextButton(
                 onPressed: () => onGo(StorePage.coupons),
-                child: const LText('쿠폰 4장'),
+                child: LText(
+                  '쿠폰 ${(store.accountBenefits?['coupons'] as List?)?.length ?? 0}장',
+                ),
               ),
             ),
             Expanded(
               child: TextButton(
                 onPressed: () => onGo(StorePage.points),
-                child: const LText('적립금 32,500P'),
+                child: LText(
+                  '적립금 ${(store.accountBenefits?['wallet'] as Map?)?['balance'] ?? 0}P',
+                ),
               ),
             ),
-            const Expanded(
-              child: TextButton(onPressed: null, child: LText('리뷰 12개')),
+            Expanded(
+              child: TextButton(
+                onPressed: null,
+                child: LText(
+                  store.reviewsError != null ||
+                          store.accountConnectionError != null
+                      ? '리뷰 조회 실패'
+                      : '리뷰 ${store.reviews.length}개',
+                ),
+              ),
             ),
           ],
         ),
+        if (store.reviewsError != null) ...[
+          LText(store.reviewsError!),
+          TextButton(
+            onPressed: store.refreshReviews,
+            child: const LText('리뷰 다시 시도'),
+          ),
+        ],
         Align(
           alignment: Alignment.centerRight,
           child: TextButton(
@@ -108,7 +231,7 @@ class ProfileScreen extends StatelessWidget {
           '주문 내역',
           StorePage.orders,
           Icons.receipt_long_outlined,
-          '배송, 교환, 반품 상태 확인',
+          '배송, 반품 상태 확인',
         ),
         ('문의 사항', StorePage.inquiry, Icons.help_outline, '문의 내역과 답변 확인'),
         (
@@ -130,7 +253,7 @@ class ProfileScreen extends StatelessWidget {
   );
 }
 
-/// 이메일 인증만 동작하는 목업 화면입니다.
+/// 이메일·Google·카카오·네이버 인증의 진입 화면입니다.
 class AuthScreen extends StatefulWidget {
   const AuthScreen({
     super.key,
@@ -138,11 +261,13 @@ class AuthScreen extends StatefulWidget {
     required this.onBack,
     required this.onDone,
     required this.onMessage,
+    this.phoneVerifier,
   });
   final StoreController store;
   final VoidCallback onBack;
   final VoidCallback onDone;
   final void Function(String) onMessage;
+  final PhoneVerifier? phoneVerifier;
   @override
   State<AuthScreen> createState() => _AuthScreenState();
 }
@@ -152,50 +277,194 @@ class _AuthScreenState extends State<AuthScreen> {
   final email = TextEditingController();
   final password = TextEditingController();
   final confirm = TextEditingController();
+  final name = TextEditingController();
+  final phone = TextEditingController();
+  int? birthYear, birthMonth, birthDay;
+  int get daysInBirthMonth =>
+      DateTime(birthYear ?? 2000, (birthMonth ?? 1) + 1, 0).day;
+  bool get hasBirthday =>
+      birthYear != null || birthMonth != null || birthDay != null;
+  bool get needsBirthday =>
+      widget.store.accountRepository is! EnrollmentAccountRepository ||
+      hasBirthday;
+  DateTime? get selectedBirthday =>
+      birthYear == null || birthMonth == null || birthDay == null
+      ? null
+      : DateTime(birthYear!, birthMonth!, birthDay!);
   String mode = 'login';
+  VerifiedPhone? _phoneProof;
   bool busy = false;
+  String loadingTitle = '로그인 중…';
+  String loadingDescription = '인증과 회원 정보를 확인하고 있어요.';
   @override
   void dispose() {
     email.dispose();
     password.dispose();
     confirm.dispose();
+    name.dispose();
+    phone.dispose();
     super.dispose();
   }
 
   void change(String value) {
-    formKey.currentState?.reset();
+    if (busy) return;
+    _changeMode(value);
+  }
+
+  void _changeMode(String value, {bool resetForm = true}) {
+    if (!mounted) return;
+    if (resetForm) formKey.currentState?.reset();
     password.clear();
     confirm.clear();
+    _phoneProof = null;
     setState(() => mode = value);
   }
 
   Future<void> submit() async {
-    if (!formKey.currentState!.validate()) return;
-    setState(() => busy = true);
+    if (busy || !(formKey.currentState?.validate() ?? false)) return;
+    FocusScope.of(context).unfocus();
+    setState(() {
+      busy = true;
+      loadingTitle = switch (mode) {
+        'signupEmail' => '회원가입 중…',
+        'reset' => '요청 처리 중…',
+        _ => '로그인 중…',
+      };
+      loadingDescription = mode == 'login'
+          ? '인증과 회원 정보를 확인하고 있어요.'
+          : '잠시만 기다려주세요.';
+    });
+    var completed = false;
     try {
       if (mode == 'login') {
         final ok = await widget.store.signIn(email.text.trim(), password.text);
+        if (!mounted) return;
         if (!ok) {
           widget.onMessage('이메일 또는 비밀번호가 올바르지 않습니다.');
           return;
         }
         widget.onDone();
+        completed = true;
       } else if (mode == 'signupEmail') {
-        await widget.store.signUp(email.text.trim(), password.text);
+        if (widget.store.accountRepository is EnrollmentAccountRepository) {
+          final phone = _phoneProof;
+          if (phone == null || phone.expired) {
+            throw StateError('휴대폰 문자 인증을 완료해주세요.');
+          }
+          await widget.store.signUpWithEnrollment(
+            email.text.trim(),
+            password.text,
+            phone,
+            selectedBirthday,
+            name: name.text.trim(),
+          );
+        } else {
+          await widget.store.signUp(
+            email.text.trim(),
+            password.text,
+            name: name.text.trim(),
+            phone: phone.text.replaceAll(RegExp(r'[^0-9]'), ''),
+            birthDate: selectedBirthday,
+          );
+        }
+        if (!mounted) return;
         widget.onMessage('회원가입이 완료되었습니다. 입력한 계정으로 로그인해주세요.');
-        change('login');
+        // Preserve the email even if signup finishes before the loading frame
+        // unmounts the form. Always clear both password controllers.
+        _changeMode('login', resetForm: false);
       } else {
         widget.onMessage('비밀번호 재설정 안내를 이메일로 보냈습니다.');
       }
     } on StateError catch (error) {
-      widget.onMessage(error.message);
+      if (mounted) widget.onMessage(error.message);
+    } catch (_) {
+      if (mounted) {
+        widget.onMessage(
+          mode == 'signupEmail'
+              ? '회원가입을 완료하지 못했습니다. 다시 시도해주세요.'
+              : '로그인을 완료하지 못했습니다. 다시 시도해주세요.',
+        );
+      }
     } finally {
-      if (mounted) setState(() => busy = false);
+      if (mounted && !completed) setState(() => busy = false);
+    }
+  }
+
+  Future<void> socialLogin(String provider) async {
+    if (busy) return;
+    FocusScope.of(context).unfocus();
+    setState(() {
+      busy = true;
+      loadingTitle = '로그인 중…';
+      loadingDescription = '인증과 회원 정보를 확인하고 있어요.';
+    });
+    var completed = false;
+    try {
+      final success = await switch (provider) {
+        '카카오' => widget.store.signInWithKakao(),
+        '네이버' => widget.store.signInWithNaver(),
+        _ => widget.store.signInWithGoogle(),
+      };
+      if (!mounted) return;
+      if (success) {
+        widget.onDone();
+        completed = true;
+      } else {
+        widget.onMessage('$provider 로그인을 취소했거나 완료하지 못했습니다.');
+      }
+    } on StateError catch (error) {
+      if (mounted) widget.onMessage(error.message);
+    } catch (_) {
+      if (mounted) widget.onMessage('$provider 로그인을 완료하지 못했습니다. 다시 시도해주세요.');
+    } finally {
+      // Keep the loading screen until navigation removes this widget. Clearing
+      // busy on success could briefly rebuild the old login form.
+      if (mounted && !completed) setState(() => busy = false);
     }
   }
 
   @override
-  Widget build(BuildContext context) => ListView(
+  Widget build(BuildContext context) => PopScope(
+    canPop: !busy,
+    child: busy
+        ? _AuthLoadingScreen(
+            title: loadingTitle,
+            description: loadingDescription,
+          )
+        : _buildForm(context),
+  );
+
+  InputDecoration _loginInputDecoration(
+    BuildContext context, {
+    required String hint,
+    required IconData icon,
+  }) {
+    final colors = Theme.of(context).colorScheme;
+    final underline = UnderlineInputBorder(
+      borderSide: BorderSide(color: colors.outlineVariant),
+    );
+    return InputDecoration(
+      hintText: translateMockupText(hint, LocaleScope.languageOf(context)),
+      hintStyle: TextStyle(color: colors.onSurfaceVariant),
+      prefixIcon: Icon(icon, color: colors.onSurface),
+      contentPadding: const EdgeInsets.symmetric(vertical: 18),
+      filled: false,
+      border: underline,
+      enabledBorder: underline,
+      disabledBorder: underline,
+      focusedBorder: UnderlineInputBorder(
+        borderSide: BorderSide(color: colors.primary, width: 2),
+      ),
+      errorBorder: UnderlineInputBorder(
+        borderSide: BorderSide(color: colors.error),
+      ),
+      focusedErrorBorder: UnderlineInputBorder(
+        borderSide: BorderSide(color: colors.error, width: 2),
+      ),
+    );
+  }
+
+  Widget _buildForm(BuildContext context) => ListView(
     padding: const EdgeInsets.all(24),
     children: [
       Align(
@@ -203,6 +472,7 @@ class _AuthScreenState extends State<AuthScreen> {
         child: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
+            if (busy) return;
             if (mode == 'login') {
               widget.onBack();
             } else if (mode == 'signupEmail') {
@@ -213,30 +483,30 @@ class _AuthScreenState extends State<AuthScreen> {
           },
         ),
       ),
-      const SizedBox(height: 24),
+      const SizedBox(height: 80),
       const LText(
-        'SHUPICK',
+        'SHOEPICK',
         style: TextStyle(
-          fontSize: 30,
+          fontSize: 32,
           fontWeight: FontWeight.w900,
           letterSpacing: 1.5,
         ),
       ),
-      const SizedBox(height: 8),
+      const SizedBox(height: 10),
       LText(switch (mode) {
         'signup' => '가입 방법 선택',
         'signupEmail' => '이메일로 가입',
         'reset' => '비밀번호 재설정',
         _ => '로그인',
-      }, style: const TextStyle(fontSize: 22)),
+      }, style: const TextStyle(fontSize: 24)),
       const SizedBox(height: 30),
       if (mode == 'signup') ...[
         for (final method in ['카카오', '네이버', 'Google'])
           Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: OutlinedButton(
-              onPressed: () => widget.onMessage('$method 가입은 준비 중입니다.'),
-              child: LText('$method로 가입 · 준비 중'),
+              onPressed: busy ? null : () => socialLogin(method),
+              child: LText('$method로 가입'),
             ),
           ),
         OutlinedButton(
@@ -248,13 +518,159 @@ class _AuthScreenState extends State<AuthScreen> {
           key: formKey,
           child: Column(
             children: [
+              if (mode == 'signupEmail') ...[
+                TextFormField(
+                  controller: name,
+                  textInputAction: TextInputAction.next,
+                  autofillHints: const [AutofillHints.name],
+                  decoration: const InputDecoration(
+                    labelText: '이름',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? '이름을 입력해주세요.'
+                      : value.trim().length > 100
+                      ? '이름은 100자 이내로 입력해주세요.'
+                      : null,
+                ),
+                const SizedBox(height: 16),
+                if (widget.store.accountRepository
+                    is! EnrollmentAccountRepository)
+                  TextFormField(
+                    controller: phone,
+                    keyboardType: TextInputType.phone,
+                    textInputAction: TextInputAction.next,
+                    autofillHints: const [AutofillHints.telephoneNumber],
+                    decoration: const InputDecoration(
+                      labelText: '전화번호',
+                      border: OutlineInputBorder(),
+                      hintText: '010-1234-5678',
+                    ),
+                    validator: (value) {
+                      final digits = (value ?? '').replaceAll(
+                        RegExp(r'[^0-9]'),
+                        '',
+                      );
+                      return digits.length >= 9 &&
+                              digits.length <= 15 &&
+                              RegExp(r'^[+0-9()\s-]+$').hasMatch(value ?? '')
+                          ? null
+                          : '올바른 전화번호를 입력해주세요.';
+                    },
+                  ),
+                const SizedBox(height: 20),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: LText(
+                    widget.store.accountRepository
+                            is EnrollmentAccountRepository
+                        ? '생년월일 (선택)'
+                        : '생년월일',
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<int>(
+                  key: ValueKey('year-$birthYear'),
+                  initialValue: birthYear,
+                  isExpanded: true,
+                  decoration: const InputDecoration(labelText: '년'),
+                  items: [
+                    for (var year = DateTime.now().year; year >= 1900; year--)
+                      DropdownMenuItem(value: year, child: LText('$year')),
+                  ],
+                  onChanged: busy
+                      ? null
+                      : (year) => setState(() {
+                          birthYear = year;
+                          if (birthDay != null &&
+                              birthDay! > daysInBirthMonth) {
+                            birthDay = null;
+                          }
+                        }),
+                  validator: (value) =>
+                      value == null && needsBirthday ? '출생 연도를 선택해주세요.' : null,
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<int>(
+                        key: ValueKey('month-$birthMonth'),
+                        initialValue: birthMonth,
+                        isExpanded: true,
+                        decoration: const InputDecoration(labelText: '월'),
+                        items: [
+                          for (var month = 1; month <= 12; month++)
+                            DropdownMenuItem(
+                              value: month,
+                              child: LText('$month'),
+                            ),
+                        ],
+                        onChanged: busy
+                            ? null
+                            : (month) => setState(() {
+                                birthMonth = month;
+                                if (birthDay != null &&
+                                    birthDay! > daysInBirthMonth) {
+                                  birthDay = null;
+                                }
+                              }),
+                        validator: (value) => value == null && needsBirthday
+                            ? '월을 선택해주세요.'
+                            : null,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: DropdownButtonFormField<int>(
+                        key: ValueKey('day-$birthYear-$birthMonth-$birthDay'),
+                        initialValue: birthDay,
+                        isExpanded: true,
+                        decoration: const InputDecoration(labelText: '일'),
+                        items: [
+                          for (var day = 1; day <= daysInBirthMonth; day++)
+                            DropdownMenuItem(value: day, child: LText('$day')),
+                        ],
+                        onChanged: busy
+                            ? null
+                            : (day) => setState(() => birthDay = day),
+                        validator: (value) {
+                          if (value == null) {
+                            return needsBirthday ? '일을 선택해주세요.' : null;
+                          }
+                          if (birthYear != null &&
+                              birthMonth != null &&
+                              DateTime(
+                                birthYear!,
+                                birthMonth!,
+                                value,
+                              ).isAfter(DateTime.now())) {
+                            return '미래 날짜는 선택할 수 없습니다.';
+                          }
+                          return null;
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+              ],
+
               TextFormField(
                 controller: email,
                 keyboardType: TextInputType.emailAddress,
-                decoration: const InputDecoration(
-                  labelText: '이메일',
-                  border: OutlineInputBorder(),
-                ),
+                decoration: mode == 'login'
+                    ? _loginInputDecoration(
+                        context,
+                        hint: '이메일을 입력해주세요.',
+                        icon: Icons.person_outline,
+                      )
+                    : const InputDecoration(
+                        labelText: '이메일',
+                        border: OutlineInputBorder(),
+                      ),
                 validator: (value) =>
                     RegExp(
                       r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
@@ -267,10 +683,16 @@ class _AuthScreenState extends State<AuthScreen> {
                 TextFormField(
                   controller: password,
                   obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: '비밀번호',
-                    border: OutlineInputBorder(),
-                  ),
+                  decoration: mode == 'login'
+                      ? _loginInputDecoration(
+                          context,
+                          hint: '비밀번호를 입력해주세요.',
+                          icon: Icons.lock_outline,
+                        )
+                      : const InputDecoration(
+                          labelText: '비밀번호',
+                          border: OutlineInputBorder(),
+                        ),
                   validator: (value) =>
                       value != null &&
                           value.length >= 8 &&
@@ -292,6 +714,15 @@ class _AuthScreenState extends State<AuthScreen> {
                   validator: (value) =>
                       value == password.text ? null : '비밀번호가 일치하지 않습니다.',
                 ),
+                if (widget.store.accountRepository
+                    is EnrollmentAccountRepository) ...[
+                  const SizedBox(height: 16),
+                  PhoneEnrollmentFields(
+                    initialProof: _phoneProof,
+                    verifier: widget.phoneVerifier,
+                    onChanged: (value) => _phoneProof = value,
+                  ),
+                ],
               ],
               const SizedBox(height: 24),
               SizedBox(
@@ -318,48 +749,34 @@ class _AuthScreenState extends State<AuthScreen> {
           onPressed: () => change('reset'),
           child: const LText('비밀번호를 잊으셨나요?'),
         ),
-        const LText(
-          '데모 계정: user@sole.kr / sole1234',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: Colors.grey),
-        ),
         const Divider(height: 32),
         const LText('간편 로그인', textAlign: TextAlign.center),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const IconButton(
-              onPressed: null,
-              tooltip: '카카오 로그인 준비 중',
-              icon: LText('K'),
-            ),
-            const IconButton(
-              onPressed: null,
-              tooltip: '네이버 로그인 준비 중',
-              icon: LText('N'),
+            IconButton(
+              onPressed: busy ? null : () => socialLogin('카카오'),
+              tooltip: '카카오 로그인',
+              iconSize: 32,
+              icon: const LoginProviderBadge.signInButton(
+                provider: AccountLoginProvider.kakao,
+              ),
             ),
             IconButton(
-              onPressed: busy
-                  ? null
-                  : () async {
-                      setState(() => busy = true);
-
-                      try {
-                        final ok = await widget.store.signInWithGoogle();
-
-                        if (ok) {
-                          widget.onDone();
-                        } else {
-                          widget.onMessage('Google 로그인에 실패했습니다.');
-                        }
-                      } finally {
-                        if (mounted) {
-                          setState(() => busy = false);
-                        }
-                      }
-                    },
+              onPressed: busy ? null : () => socialLogin('네이버'),
+              tooltip: '네이버 로그인',
+              iconSize: 32,
+              icon: const LoginProviderBadge.signInButton(
+                provider: AccountLoginProvider.naver,
+              ),
+            ),
+            IconButton(
+              onPressed: busy ? null : () => socialLogin('Google'),
               tooltip: 'Google 로그인',
-              icon: const LText('G'),
+              iconSize: 32,
+              icon: const LoginProviderBadge.signInButton(
+                provider: AccountLoginProvider.google,
+              ),
             ),
           ],
         ),
@@ -369,6 +786,56 @@ class _AuthScreenState extends State<AuthScreen> {
           child: const LText('로그인으로 돌아가기'),
         ),
     ],
+  );
+}
+
+/// Remains visible when a provider window returns until login preparation ends.
+class _AuthLoadingScreen extends StatelessWidget {
+  const _AuthLoadingScreen({required this.title, required this.description});
+
+  final String title;
+  final String description;
+
+  @override
+  Widget build(BuildContext context) => SafeArea(
+    child: Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const LText(
+              'SHOEPICK',
+              style: TextStyle(
+                fontSize: 30,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1.5,
+              ),
+            ),
+            const SizedBox(height: 32),
+            const SizedBox(
+              width: 44,
+              height: 44,
+              child: CircularProgressIndicator(strokeWidth: 3),
+            ),
+            const SizedBox(height: 24),
+            Semantics(
+              liveRegion: true,
+              child: LText(
+                title,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            LText(description, textAlign: TextAlign.center),
+          ],
+        ),
+      ),
+    ),
   );
 }
 

@@ -5,6 +5,12 @@ import 'package:shupick/data/mock_repositories.dart';
 import 'package:shupick/domain/models.dart';
 import 'package:shupick/presentation/store_shell.dart';
 
+class FailingReviewRepository extends MockReviewRepository {
+  @override
+  Future<List<ProductReview>> getReviews() async =>
+      throw StateError('Customer profile is not linked');
+}
+
 void main() {
   test('GetX 화면 이동 기록에 따라 이전 화면으로 돌아간다', () {
     final navigation = StoreNavigationController();
@@ -17,6 +23,25 @@ void main() {
     expect(navigation.page, StorePage.catalog);
     navigation.back();
     expect(navigation.page, StorePage.home);
+  });
+
+  test('리뷰 조회가 실패해도 상품 목록은 표시한다', () async {
+    final store = StoreController(
+      productsRepository: MockProductRepository(),
+      accountRepository: MockAccountRepository(),
+      orderRepository: MockOrderRepository(),
+      reviewRepository: FailingReviewRepository(),
+      shoppingRepository: MockShoppingRepository(),
+      supportRepository: MockSupportRepository(),
+    );
+
+    await store.load();
+
+    expect(store.loadError, isNull);
+    expect(store.products, isNotEmpty);
+    expect(store.ordersError, isNull);
+    expect(store.reviewsError, isNotNull);
+    store.dispose();
   });
 
   test('목업 상품 조회와 장바구니 주문 흐름', () async {

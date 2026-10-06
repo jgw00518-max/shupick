@@ -5,8 +5,9 @@ import '../../app/store_controller.dart';
 import '../../data/mock_repositories.dart';
 import '../../domain/models.dart';
 import '../shared/store_widgets.dart';
+import '../shared/app_theme.dart';
+import '../shared/collection_product_card.dart';
 
-const searchCategories = ['전체', '운동화', '구두', '로퍼', '부츠', '샌들', '슬리퍼'];
 const campaignData = <String, ({String subtitle, List<int> ids})>{
   '이번 주 특가': (subtitle: '가볍게 시작하는 쇼핑', ids: [5, 6, 14, 19]),
   '매일 신는 좋은 신발': (subtitle: '일상에 자연스럽게 어울리는 선택', ids: [1, 9, 10, 16]),
@@ -33,7 +34,7 @@ class HomeScreen extends StatelessWidget {
         child: ClipRRect(
           borderRadius: BorderRadius.circular(16),
           child: SizedBox(
-            height: 264,
+            height: 280 * MediaQuery.textScalerOf(context).scale(14) / 14,
             child: Stack(
               fit: StackFit.expand,
               children: [
@@ -62,7 +63,7 @@ class HomeScreen extends StatelessWidget {
                         'THE EVERYDAY EDIT',
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: 12,
+                          fontSize: 14,
                           letterSpacing: 2,
                         ),
                       ),
@@ -71,7 +72,7 @@ class HomeScreen extends StatelessWidget {
                         '오늘의 발걸음,\n나만의 스타일.',
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: 28,
+                          fontSize: 30,
                           height: 1.2,
                           fontWeight: FontWeight.w800,
                         ),
@@ -128,7 +129,7 @@ class HomeScreen extends StatelessWidget {
                             height: 88,
                             clipBehavior: Clip.antiAlias,
                             decoration: BoxDecoration(
-                              shape: BoxShape.circle,
+                              borderRadius: BorderRadius.circular(18),
                               color: Theme.of(
                                 context,
                               ).colorScheme.surfaceContainerHighest,
@@ -143,13 +144,16 @@ class HomeScreen extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 10),
-                          LText(
-                            entry.key,
+                          Text(
+                            translateMockupText(
+                              entry.key,
+                              LocaleScope.languageOf(context),
+                            ).replaceFirst(' \uC88B\uC740', '\n\uC88B\uC740'),
                             textAlign: TextAlign.center,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
-                              fontSize: 13,
+                              fontSize: 15,
                               height: 1.35,
                               fontWeight: FontWeight.w600,
                             ),
@@ -176,22 +180,25 @@ class HomeScreen extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 18),
           child: LText(
             entry.value.subtitle,
-            style: const TextStyle(color: Color(0xFF777777), fontSize: 14),
+            style: const TextStyle(color: Color(0xFF5F6975), fontSize: 16),
           ),
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(18, 16, 10, 0),
           child: Row(
             children: [
-              for (final id in entry.value.ids.take(2))
+              for (final product in _campaignProducts(
+                store,
+                entry.value.ids,
+                limit: 2,
+              ))
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.only(right: 8),
                     child: ProductCard(
-                      product: store.products.firstWhere((p) => p.id == id),
+                      product: product,
                       store: store,
-                      onOpen: () =>
-                          onOpen(store.products.firstWhere((p) => p.id == id)),
+                      onOpen: () => onOpen(product),
                     ),
                   ),
                 ),
@@ -203,8 +210,24 @@ class HomeScreen extends StatelessWidget {
   );
 }
 
-String _campaignImage(StoreController store, int id) =>
-    store.products.firstWhere((product) => product.id == id).imageUrl;
+String _campaignImage(StoreController store, int id) {
+  for (final product in store.products) {
+    if (product.id == id) return product.imageUrl;
+  }
+  return store.products.isEmpty ? mockHeroImage : store.products.first.imageUrl;
+}
+
+/// 목업 기획전 ID가 실제 DB에 없으면 현재 상품 중 일부를 안전하게 대체 표시합니다.
+List<Product> _campaignProducts(
+  StoreController store,
+  List<int> ids, {
+  required int limit,
+}) {
+  final byId = {for (final product in store.products) product.id: product};
+  final matched = ids.map((id) => byId[id]).whereType<Product>().take(limit);
+  if (matched.isNotEmpty) return matched.toList();
+  return store.products.take(limit).toList();
+}
 
 /// 원본의 성별·중분류·하위 분류·다섯 가지 정렬을 적용합니다.
 class CatalogScreen extends StatefulWidget {
@@ -264,8 +287,8 @@ class _CatalogScreenState extends State<CatalogScreen> {
             child: LText(
               '${widget.initialGender ?? '전체'} · $subcategory',
               style: const TextStyle(
-                color: Color(0xFF777777),
-                fontSize: 14,
+                color: Color(0xFF5F6975),
+                fontSize: 16,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -279,7 +302,8 @@ class _CatalogScreenState extends State<CatalogScreen> {
             children: [
               for (final value in [
                 '전체',
-                ...MockProductRepository.categoryTree[widget.initialMiddle]!,
+                ...widget.store.categoryTree[widget.initialMiddle] ??
+                    const <String>[],
               ])
                 Padding(
                   padding: const EdgeInsets.only(right: 8),
@@ -302,7 +326,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
                         color: subcategory == value
                             ? Colors.white
                             : Colors.black87,
-                        fontSize: 14,
+                        fontSize: 16,
                       ),
                     ),
                   ),
@@ -316,7 +340,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
             children: [
               LText(
                 '${products.length}개 상품',
-                style: const TextStyle(color: Color(0xFF777777), fontSize: 14),
+                style: const TextStyle(color: Color(0xFF5F6975), fontSize: 16),
               ),
               const Spacer(),
               Container(
@@ -335,7 +359,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
                           value: value,
                           child: LText(
                             value,
-                            style: const TextStyle(fontSize: 14),
+                            style: const TextStyle(fontSize: 16),
                           ),
                         ),
                       )
@@ -376,12 +400,19 @@ class ProductGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) => GridView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(AppSpacing.page),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: constraints.maxWidth > 700 ? 4 : 2,
-        childAspectRatio: showDetails ? .50 : .64,
+        mainAxisExtent:
+            (constraints.maxWidth -
+                    40 -
+                    12 * ((constraints.maxWidth > 700 ? 4 : 2) - 1)) /
+                (constraints.maxWidth > 700 ? 4 : 2) +
+            (showDetails ? 250 : 160) *
+                MediaQuery.textScalerOf(context).scale(14) /
+                14,
         crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
+        mainAxisSpacing: 24,
       ),
       itemCount: products.length,
       itemBuilder: (_, index) => ProductCard(
@@ -407,13 +438,10 @@ class CampaignScreen extends StatelessWidget {
   final void Function(Product) onOpen;
   @override
   Widget build(BuildContext context) {
-    final data = campaignData[title]!;
-    final products = store.products
-        .where((p) => data.ids.contains(p.id))
-        .toList();
-    products.sort(
-      (a, b) => data.ids.indexOf(a.id).compareTo(data.ids.indexOf(b.id)),
-    );
+    final data = campaignData[title];
+    if (data == null) return const EmptyState('기획전을 찾을 수 없습니다.');
+    final products = _campaignProducts(store, data.ids, limit: data.ids.length);
+    if (products.isEmpty) return const EmptyState('기획전 상품이 없습니다.');
     return Column(
       children: [
         SizedBox(
@@ -451,8 +479,8 @@ class CampaignScreen extends StatelessWidget {
   }
 }
 
-/// 최근 본 상품과 찜 목록은 원본처럼 행 목록으로 표시합니다.
-class ProductCollectionScreen extends StatelessWidget {
+/// 최근 본 상품과 찜 목록을 공통 카드로 표시합니다.
+class ProductCollectionScreen extends StatefulWidget {
   const ProductCollectionScreen({
     super.key,
     required this.title,
@@ -466,47 +494,152 @@ class ProductCollectionScreen extends StatelessWidget {
   final StoreController store;
   final void Function(Product) onOpen;
   final bool canRemove;
+
   @override
-  Widget build(BuildContext context) => products.isEmpty
-      ? EmptyState(title == '최근 본 상품' ? '최근 본 상품이 없어요' : '저장한 상품이 없어요')
-      : ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            for (final product in products)
-              Card(
-                child: Row(
-                  children: [
-                    InkWell(
-                      onTap: () => onOpen(product),
-                      child: SizedBox(
-                        width: 94,
-                        child: ProductImage(product, height: 94),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          LText(product.category),
-                          LText(
-                            product.name,
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          LText(won(product.price)),
-                        ],
-                      ),
-                    ),
-                    if (canRemove)
-                      TextButton(
-                        onPressed: () => store.toggleWish(product),
-                        child: const LText('삭제'),
-                      ),
-                  ],
+  State<ProductCollectionScreen> createState() =>
+      _ProductCollectionScreenState();
+}
+
+class _ProductCollectionScreenState extends State<ProductCollectionScreen> {
+  GlobalKey<SliverAnimatedListState> _listKey =
+      GlobalKey<SliverAnimatedListState>();
+  late List<Product> _products;
+  String? _accountKey;
+  int _removing = 0;
+  int _generation = 0;
+  static const _duration = Duration(milliseconds: 300);
+
+  @override
+  void initState() {
+    super.initState();
+    _products = List.of(widget.products);
+    _accountKey = widget.store.accountIdentityKey;
+  }
+
+  @override
+  void didUpdateWidget(ProductCollectionScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.title != widget.title ||
+        oldWidget.canRemove != widget.canRemove ||
+        _accountKey != widget.store.accountIdentityKey ||
+        !widget.store.shoppingReady) {
+      _accountKey = widget.store.accountIdentityKey;
+      _generation++;
+      _removing = 0;
+      _products = List.of(widget.products);
+      _listKey = GlobalKey<SliverAnimatedListState>();
+      return;
+    }
+    final incoming = widget.products;
+    for (var i = _products.length - 1; i >= 0; i--) {
+      if (!incoming.any((product) => product.id == _products[i].id)) {
+        _removeAt(i);
+      }
+    }
+    for (var i = 0; i < incoming.length; i++) {
+      if (i < _products.length && _products[i].id == incoming[i].id) {
+        _products[i] = incoming[i];
+        continue;
+      }
+      final previous = _products.indexWhere(
+        (product) => product.id == incoming[i].id,
+      );
+      if (previous >= 0) _removeAt(previous);
+      _products.insert(i, incoming[i]);
+      _listKey.currentState?.insertItem(i, duration: _animationDuration);
+    }
+  }
+
+  Duration get _animationDuration =>
+      MediaQuery.disableAnimationsOf(context) ? Duration.zero : _duration;
+
+  void _removeAt(int index) {
+    final product = _products.removeAt(index);
+    final list = _listKey.currentState;
+    if (list == null) return;
+    final duration = _animationDuration;
+    final generation = _generation;
+    _removing++;
+    list.removeItem(
+      index,
+      (context, animation) =>
+          IgnorePointer(child: _animatedCard(product, animation)),
+      duration: duration,
+    );
+    Future<void>.delayed(duration, () {
+      if (mounted && generation == _generation) {
+        setState(() => _removing--);
+      }
+    });
+  }
+
+  Widget _animatedCard(Product product, Animation<double> animation) {
+    final curved = animation.drive(CurveTween(curve: Curves.easeInOutCubic));
+    return SizeTransition(
+      sizeFactor: curved,
+      alignment: Alignment.topCenter,
+      child: FadeTransition(
+        opacity: curved,
+        child: SlideTransition(
+          position: curved.drive(
+            Tween(begin: const Offset(.06, 0), end: Offset.zero),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: CollectionProductCard(
+              product: product,
+              onOpen: () => widget.onOpen(product),
+              onRemove: widget.canRemove && widget.store.shoppingReady
+                  ? () => widget.store.toggleWish(product)
+                  : null,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_products.isEmpty && _removing == 0) {
+      return EmptyState(
+        widget.title == '최근 본 상품' ? '최근 본 상품이 없어요' : '저장한 상품이 없어요',
+      );
+    }
+    final theme = Theme.of(context);
+    return CustomScrollView(
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          sliver: SliverToBoxAdapter(
+            child: Wrap(
+              spacing: 12,
+              runSpacing: 4,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                LText(widget.title, style: theme.textTheme.titleLarge),
+                LText(
+                  '${_products.length}개',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                 ),
-              ),
-          ],
-        );
+              ],
+            ),
+          ),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+          sliver: SliverAnimatedList(
+            key: _listKey,
+            initialItemCount: _products.length,
+            itemBuilder: (context, index, animation) =>
+                _animatedCard(_products[index], animation),
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 /// 검색어와 상품 종류를 동시에 적용합니다.
@@ -522,6 +655,7 @@ class _SearchScreenState extends State<SearchScreen> {
   String query = '';
   String category = '전체';
   String? selectedGender;
+  String? selectedBrand;
 
   @override
   Widget build(BuildContext context) {
@@ -529,7 +663,10 @@ class _SearchScreenState extends State<SearchScreen> {
         .where(
           (item) =>
               (selectedGender == null || item.gender == selectedGender) &&
-              (category == '전체' || item.category == category) &&
+              (category == '전체' || item.middleCategory == category) &&
+              (selectedBrand == null ||
+                  (widget.store.brands[selectedBrand]?.contains(item.id) ??
+                      false)) &&
               (item.name.toLowerCase().contains(query.toLowerCase()) ||
                   item.category.contains(query)),
         )
@@ -538,9 +675,24 @@ class _SearchScreenState extends State<SearchScreen> {
     final content = Column(
       children: [
         const Padding(
-          padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
+          padding: EdgeInsets.fromLTRB(16, 12, 16, 20),
           child: SectionTitle('신발 찾기'),
         ),
+        if (widget.store.brands.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: DropdownButtonFormField<String>(
+              initialValue: selectedBrand ?? '',
+              decoration: const InputDecoration(labelText: '브랜드'),
+              items: [
+                const DropdownMenuItem(value: '', child: LText('전체 브랜드')),
+                for (final brand in widget.store.brands.keys)
+                  DropdownMenuItem(value: brand, child: LText(brand)),
+              ],
+              onChanged: (value) =>
+                  setState(() => selectedBrand = value == '' ? null : value),
+            ),
+          ),
         const Padding(
           padding: EdgeInsets.symmetric(horizontal: 16),
           child: LText('스타일과 용도에 맞는 한 켤레를 골라보세요.'),
@@ -558,20 +710,45 @@ class _SearchScreenState extends State<SearchScreen> {
           ),
         ),
         SizedBox(
-          height: 42,
+          height: (MediaQuery.textScalerOf(context).scale(17) * 1.4 + 28).clamp(
+            56.0,
+            double.infinity,
+          ),
           child: ListView(
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             children: [
-              for (final value in searchCategories)
+              for (final value in ['전체', ...widget.store.categoryTree.keys])
                 Padding(
                   padding: const EdgeInsets.only(right: 8),
-                  child: TextButton(
-                    onPressed: () => setState(() => category = value),
-                    child: LText(
-                      value,
-                      style: TextStyle(
-                        color: category == value ? brandBlue : Colors.black54,
+                  child: Center(
+                    child: ChoiceChip(
+                      selected: category == value,
+                      onSelected: (_) => setState(() => category = value),
+                      showCheckmark: false,
+                      selectedColor: colorScheme.primary,
+                      backgroundColor: colorScheme.surface,
+                      side: BorderSide(
+                        color: category == value
+                            ? colorScheme.primary
+                            : colorScheme.outlineVariant,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 8,
+                      ),
+                      label: LText(
+                        value,
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w600,
+                          color: category == value
+                              ? colorScheme.onPrimary
+                              : colorScheme.onSurfaceVariant,
+                        ),
                       ),
                     ),
                   ),
@@ -579,8 +756,9 @@ class _SearchScreenState extends State<SearchScreen> {
             ],
           ),
         ),
+
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
           child: Align(
             alignment: Alignment.centerLeft,
             child: LText('${results.length}개의 상품'),

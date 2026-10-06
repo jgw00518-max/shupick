@@ -1,0 +1,34 @@
+{
+  "brand": {"code": "SP", "name": "SHOEPICK"},
+  "retire_model_codes": ["NK-M-SN-0001", "TEST-ACCOUNT-A", "TEST-ACCOUNT-B", "TEST-ACCOUNT-C"],
+  "categories": [
+    {"code": "SH", "name": "신발", "parent": null},
+    {"code": "SP-SNK", "name": "스니커즈", "parent": "SH"},
+    {"code": "SP-LOW", "name": "로우탑", "parent": "SP-SNK"},
+    {"code": "SP-SPT", "name": "스포츠", "parent": "SH"},
+    {"code": "SP-RUN", "name": "러닝화", "parent": "SP-SPT"},
+    {"code": "SP-WALK", "name": "워킹화", "parent": "SP-SPT"},
+    {"code": "SP-KIDS", "name": "키즈", "parent": "SH"},
+    {"code": "SP-KRUN", "name": "키즈 운동화", "parent": "SP-KIDS"}
+  ],
+  "images": {
+    "black_runner": "https://d8j0ntlcm91z4.cloudfront.net/user_3JjAHkEXFHHfG3ERJjDsSHbdRq6/hf_20260928_071141_4579da28-0d2f-42fc-8ecf-9901a170129b.png",
+    "cobalt": "https://d8j0ntlcm91z4.cloudfront.net/user_3JjAHkEXFHHfG3ERJjDsSHbdRq6/hf_20260928_071141_2e7f3842-62de-421a-8855-6bbac9864ab6.png",
+    "silver": "https://d8j0ntlcm91z4.cloudfront.net/user_3JjAHkEXFHHfG3ERJjDsSHbdRq6/hf_20260928_071118_496afa2f-095c-4ce1-87bd-81f09c8f9fc7.png",
+    "black": "https://d8j0ntlcm91z4.cloudfront.net/user_3JjAHkEXFHHfG3ERJjDsSHbdRq6/hf_20260928_071118_883111c9-d119-43bf-a16d-d11f25469a67.png",
+    "beige": "https://d8j0ntlcm91z4.cloudfront.net/user_3JjAHkEXFHHfG3ERJjDsSHbdRq6/hf_20260928_071117_6e9218c6-59d9-4a86-ab98-c15b856fd71c.png",
+    "gray": "https://d8j0ntlcm91z4.cloudfront.net/user_3JjAHkEXFHHfG3ERJjDsSHbdRq6/hf_20260928_071118_4a6637ae-b3c0-45bf-8dc4-23873e53ac6c.png"
+  },
+  "products": [
+    {"model": "SP-001", "name": "에어플로우 러너", "category": "SP-RUN", "gender": "U", "price": 89000, "description": "일상과 가벼운 러닝을 위한 SHOEPICK 러너. 메시 소재와 유연한 쿠션 밑창을 조합한 디자인입니다.", "color_code": "BLK", "color": "블랙", "image": "black_runner", "sizes": [240, 250, 260, 270, 280], "stock": 20},
+    {"model": "SP-002", "name": "코발트 쿠션 러너", "category": "SP-RUN", "gender": "U", "price": 99000, "description": "코발트 컬러가 돋보이는 쿠션 러너. 스포티한 실루엣으로 데일리 룩에 포인트를 더합니다.", "color_code": "CBL", "color": "코발트", "image": "cobalt", "sizes": [240, 250, 260, 270, 280], "stock": 15},
+    {"model": "SP-003", "name": "라이트 메쉬 워커", "category": "SP-WALK", "gender": "W", "price": 79000, "description": "실버 톤과 가벼운 메시 디자인의 워킹화. 출근길부터 주말 산책까지 어울리는 기본 아이템입니다.", "color_code": "SLV", "color": "실버", "image": "silver", "sizes": [225, 230, 235, 240, 245], "stock": 20},
+    {"model": "SP-004", "name": "시티 블랙 스니커즈", "category": "SP-LOW", "gender": "M", "price": 89000, "description": "블랙 컬러의 깔끔한 로우탑 스니커즈. 데님과 슬랙스에 함께 매치하기 좋은 도시적인 디자인입니다.", "color_code": "BLK", "color": "블랙", "image": "black", "sizes": [250, 255, 260, 265, 270], "stock": 18},
+    {"model": "SP-005", "name": "클래식 베이지 스니커즈", "category": "SP-LOW", "gender": "U", "price": 79000, "description": "차분한 베이지 컬러의 데일리 스니커즈. 계절에 관계없이 다양한 옷차림에 자연스럽게 어울립니다.", "color_code": "BEI", "color": "베이지", "image": "beige", "sizes": [230, 240, 250, 260, 270], "stock": 20},
+    {"model": "SP-006", "name": "어반 그레이 러너", "category": "SP-RUN", "gender": "M", "price": 109000, "description": "그레이 톤의 입체적인 패널을 적용한 러너. 일상에서 스포티한 분위기를 연출하는 SHOEPICK 컬렉션입니다.", "color_code": "GRY", "color": "그레이", "image": "gray", "sizes": [250, 255, 260, 265, 270], "stock": 15},
+    {"model": "SP-007", "name": "플렉스 실버 워커", "category": "SP-WALK", "gender": "W", "price": 89000, "description": "부드러운 실버 컬러와 유연한 실루엣의 워킹화. 편안한 일상 코디를 위한 심플한 디자인입니다.", "color_code": "SLV", "color": "실버", "image": "silver", "sizes": [230, 235, 240, 245, 250], "stock": 15},
+    {"model": "SP-008", "name": "위켄드 로우 스니커즈", "category": "SP-LOW", "gender": "U", "price": 59000, "description": "주말 외출에 어울리는 베이지 로우탑. 부담 없는 기본 형태로 다양한 캐주얼 룩에 매치할 수 있습니다.", "color_code": "BEI", "color": "베이지", "image": "beige", "sizes": [230, 240, 250, 260, 270], "stock": 25},
+    {"model": "SP-009", "name": "주니어 라이트 러너", "category": "SP-KRUN", "gender": "K", "price": 49000, "description": "활기찬 코발트 컬러의 키즈 러너. 등교와 주말 나들이를 위한 주니어 사이즈 컬렉션입니다.", "color_code": "CBL", "color": "코발트", "image": "cobalt", "sizes": [180, 190, 200, 210, 220], "stock": 12},
+    {"model": "SP-010", "name": "주니어 데일리 스니커즈", "category": "SP-KRUN", "gender": "K", "price": 45000, "description": "차분한 그레이 컬러의 키즈 스니커즈. 활동적인 하루에 어울리는 데일리 디자인입니다.", "color_code": "GRY", "color": "그레이", "image": "gray", "sizes": [180, 190, 200, 210, 220], "stock": 12}
+  ]
+}

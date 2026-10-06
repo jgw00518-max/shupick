@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import '../localization.dart';
+import 'app_theme.dart';
 
 import '../../app/store_controller.dart';
 import '../../domain/models.dart';
 
-const brandBlue = Color(0xFF244D82);
-const canvas = Color(0xFFF7F6F3);
+const brandBlue = AppColors.primary;
+const canvas = AppColors.background;
 
 String won(int amount) {
   final value = amount.toString();
@@ -55,6 +56,7 @@ class _ProductCardState extends State<ProductCard> {
   @override
   Widget build(BuildContext context) => InkWell(
     onTap: widget.onOpen,
+    borderRadius: BorderRadius.circular(AppSpacing.radius),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -63,7 +65,7 @@ class _ProductCardState extends State<ProductCard> {
             AspectRatio(
               aspectRatio: 1,
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppSpacing.radius),
                 child: ProductImage(widget.product, height: double.infinity),
               ),
             ),
@@ -72,7 +74,9 @@ class _ProductCardState extends State<ProductCard> {
               top: 6,
               child: IconButton(
                 tooltip: '찜',
-                onPressed: () => widget.store.toggleWish(widget.product),
+                onPressed: widget.store.shoppingReady
+                    ? () => widget.store.toggleWish(widget.product)
+                    : null,
                 icon: Icon(
                   widget.store.wishedIds.contains(widget.product.id)
                       ? Icons.favorite
@@ -89,19 +93,21 @@ class _ProductCardState extends State<ProductCard> {
         const SizedBox(height: 10),
         LText(
           '${widget.product.gender}  ${widget.product.category}',
-          style: const TextStyle(color: Color(0xFF777777), fontSize: 13),
-        ),
-        const SizedBox(height: 3),
-        LText(
-          widget.product.name,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
         const SizedBox(height: 6),
         LText(
+          widget.product.name,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(fontSize: 18),
+        ),
+        const SizedBox(height: 8),
+        LText(
           won(widget.product.price),
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          style: Theme.of(context).textTheme.titleMedium,
         ),
         if (widget.showDetails) ...[
           const SizedBox(height: 5),
@@ -109,7 +115,7 @@ class _ProductCardState extends State<ProductCard> {
             '${widget.product.colors.take(3).join(' · ')} 외',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 13),
+            style: const TextStyle(fontSize: 15),
           ),
           InkWell(
             onTap: () => setState(() => sizesOpen = !sizesOpen),
@@ -121,7 +127,7 @@ class _ProductCardState extends State<ProductCard> {
           if (sizesOpen)
             const LText(
               '230  240  250  260  270  280',
-              style: TextStyle(fontSize: 12),
+              style: TextStyle(fontSize: 14),
             ),
         ],
       ],
@@ -138,17 +144,16 @@ class SectionTitle extends StatelessWidget {
   Widget build(BuildContext context) => Row(
     children: [
       Expanded(
-        child: LText(
-          title,
-          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
-        ),
+        child: LText(title, style: Theme.of(context).textTheme.titleLarge),
       ),
       if (action != null)
         TextButton(
           onPressed: onAction,
           child: LText(
             action!,
-            style: const TextStyle(color: Color(0xFF555555), fontSize: 14),
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
         ),
     ],

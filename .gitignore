@@ -58,6 +58,7 @@ doc/api/
 
 # dotenv environment variables file
 .env*
+!**/.env.example
 
 # Avoid committing generated Javascript files:
 *.dart.js
@@ -411,3 +412,11 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Social provider configuration is local to each developer.
+social-login.local.json
+ios/Flutter/SocialLogin.local.xcconfig
+social-login.json
+
+# Local catalog import rollback snapshots.
+/backend/.local/
