@@ -46,6 +46,17 @@ class ProductCard extends StatefulWidget {
   final StoreController store;
   final VoidCallback onOpen;
   final bool showDetails;
+
+  /// Reserve the square image plus every text row, including expanded sizes.
+  static double gridHeight(BuildContext context, double width, bool details) {
+    final scaler = MediaQuery.textScalerOf(context);
+    final textHeight = scaler.scale(13) * 1.4 + scaler.scale(16) * 1.4 * 2;
+    final detailsHeight = details
+        ? (scaler.scale(13) + scaler.scale(14) + scaler.scale(12)) * 1.4 + 15
+        : 0.0;
+    return (width + 19 + textHeight + detailsHeight).ceilToDouble();
+  }
+
   @override
   State<ProductCard> createState() => _ProductCardState();
 }
@@ -89,19 +100,35 @@ class _ProductCardState extends State<ProductCard> {
         const SizedBox(height: 10),
         LText(
           '${widget.product.gender}  ${widget.product.category}',
-          style: const TextStyle(color: Color(0xFF777777), fontSize: 13),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: Color(0xFF777777),
+            fontSize: 13,
+            height: 1.4,
+          ),
         ),
         const SizedBox(height: 3),
         LText(
           widget.product.name,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            height: 1.4,
+          ),
         ),
         const SizedBox(height: 6),
         LText(
           won(widget.product.price),
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            height: 1.4,
+          ),
         ),
         if (widget.showDetails) ...[
           const SizedBox(height: 5),
@@ -109,19 +136,26 @@ class _ProductCardState extends State<ProductCard> {
             '${widget.product.colors.take(3).join(' · ')} 외',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 13),
+            style: const TextStyle(fontSize: 13, height: 1.4),
           ),
           InkWell(
             onTap: () => setState(() => sizesOpen = !sizesOpen),
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 5),
-              child: LText(sizesOpen ? 'SIZE ▲' : 'SIZE ▼'),
+              child: LText(
+                sizesOpen ? 'SIZE ▲' : 'SIZE ▼',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 14, height: 1.4),
+              ),
             ),
           ),
           if (sizesOpen)
             const LText(
               '230  240  250  260  270  280',
-              style: TextStyle(fontSize: 12),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 12, height: 1.4),
             ),
         ],
       ],

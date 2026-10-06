@@ -171,7 +171,7 @@ class _StoreShellState extends State<StoreShell> {
         child: Theme(
           data: dark ? ThemeData.dark(useMaterial3: true) : Theme.of(context),
           child: Scaffold(
-            appBar: page == StorePage.auth
+            appBar: page == StorePage.auth || page == StorePage.search
                 ? null
                 : AppBar(
                     backgroundColor: dark ? null : Colors.white,
@@ -311,7 +311,11 @@ class _StoreShellState extends State<StoreShell> {
       initialMiddle: catalogMiddle,
       initialSubcategory: catalogSubcategory,
     ),
-    StorePage.search => SearchScreen(store: store, onOpen: openProduct),
+    StorePage.search => SearchScreen(
+      store: store,
+      onOpen: openProduct,
+      onBack: back,
+    ),
     StorePage.campaign => CampaignScreen(
       title: campaign,
       store: store,
