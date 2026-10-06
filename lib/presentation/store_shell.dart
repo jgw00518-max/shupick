@@ -127,9 +127,15 @@ class _StoreShellState extends State<StoreShell> {
     go(StorePage.catalog);
   }
 
-  void message(String text) => ScaffoldMessenger.of(
-    context,
-  ).showSnackBar(SnackBar(content: LText(text)));
+  void message(String text) => ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: LText(text),
+      duration:
+          RegExp(r'\[(GOOGLE|GOOGLE_FIREBASE|KAKAO|NAVER|SMS):').hasMatch(text)
+          ? const Duration(seconds: 15)
+          : const Duration(seconds: 4),
+    ),
+  );
 
   String get title => switch (page) {
     StorePage.home => 'SHOEPICK',

@@ -78,6 +78,37 @@ app, open **customer management**, answer the test inquiry, and refresh the
 same inquiry in the customer app. Existing data should remain unchanged apart
 from the deliberately submitted inquiry answer and the new test employee.
 
+## In-person return registration
+
+Returns are registered by a BRANCH_STAFF or BRANCH_MANAGER employee at the pickup branch.
+Use GET /staff/returns/order?branchId=...&orderNumber=... to look up the customer's order,
+then POST /staff/orders/{order_id}/returns with selected items, quantities, reasonCode,
+reason, unworn, undamaged and completePackaging. The server verifies the current branch
+assignment, pickup completion, purchase confirmation, duplicate requests, quantities and
+the existing return conditions. Registration uses existing tables and does not restock or refund.
+Headquarters inspection and the separate refund APIs continue the existing workflow.
+Customer POST /orders/{order_id}/returns now returns 403 with an in-person registration message.
+Restart the backend after updating these routes. No additional database migration is needed.
+
+## Headquarters procurement requisitions
+
+Apply ../database/migrations/027_hq_procurement_without_branch.sql before running the
+updated procurement API. New requisitions contain product options, quantities, title
+and reason and store branch_id=NULL. Existing branch associations are preserved.
+The requisition listing uses a LEFT JOIN so headquarters requests remain visible.
+
+## Staff test return refunds
+
+GET /staff/returns/{return_id}/refund calculates the approved item amounts from the
+original order's coupon and point allocation. POST /staff/returns/{return_id}/refund/test
+requires confirmTest=true and expectedRefundAmount, then reuses the existing refund
+creation/completion transactions. Both routes require REFUND_MANAGE.
+Only payments with a Flutter-generated flutter-payment- transaction key qualify;
+the endpoint records a TEST-RETURN receipt and never calls a payment provider.
+Repeated requests use the same refund and do not restore inventory again. Real payment
+provider refunds require a separate integration. Restart the API after updating; no
+additional migration is needed.
+
 ## Firebase outbox worker
 
 Firestore must first be enabled and a `(default)` database created for

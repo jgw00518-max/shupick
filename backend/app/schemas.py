@@ -205,7 +205,6 @@ class ProcurementItemRequest(BaseModel):
 
 
 class ProcurementRequisitionCreateRequest(BaseModel):
-    branchId: int = Field(gt=0)
     title: str = Field(min_length=1, max_length=150)
     reason: str = Field(min_length=1)
     items: list[ProcurementItemRequest] = Field(min_length=1)

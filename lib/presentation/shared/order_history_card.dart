@@ -278,7 +278,7 @@ class OrderHistoryCard extends StatelessWidget {
                       alignment: Alignment.centerRight,
                       child: TextButton(
                         onPressed: onReturn,
-                        child: const LText('반품 신청'),
+                        child: const LText('반품 안내'),
                       ),
                     ),
                   ],

@@ -855,76 +855,37 @@ class OrdersScreen extends StatelessWidget {
   }
 
   Future<void> _return(BuildContext context, StoreOrder order) async {
-    final quantities = <String, int>{};
-    final confirmed = await showDialog<bool>(
+    await showDialog<void>(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const LText('상품 선택 반품 신청'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const LText(
-                  '수령 후 7일 이내, 미착용·훼손 없음·구성품과 포장 유지 조건의 단순변심 반품입니다. 검수 후 환불됩니다.',
-                ),
-                for (final item in order.items)
-                  ListTile(
-                    title: Text(item.product.name),
-                    subtitle: Text('${item.color} / ${item.size}'),
-                    trailing: DropdownButton<int>(
-                      value: quantities[item.key] ?? 0,
-                      items: List.generate(
-                        item.quantity + 1,
-                        (quantity) => DropdownMenuItem(
-                          value: quantity,
-                          child: Text(quantity == 0 ? '선택 안 함' : '$quantity개'),
-                        ),
-                      ),
-                      onChanged: (quantity) => setDialogState(() {
-                        if (quantity == null || quantity == 0) {
-                          quantities.remove(item.key);
-                        } else {
-                          quantities[item.key] = quantity;
-                        }
-                      }),
-                    ),
-                  ),
-                const LText('한 주문당 반품 신청은 한 번만 가능합니다. 신청할 상품을 모두 선택해주세요.'),
-              ],
-            ),
+      builder: (context) => AlertDialog(
+        title: const LText('대리점 방문 반품 안내'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const LText(
+                '반품은 상품을 수령한 대리점에 방문하여 직원에게 접수해주세요. 상품과 구성품·포장을 함께 가져오세요.',
+              ),
+              const SizedBox(height: 16),
+              Text('주문번호: ${order.number}'),
+              const SizedBox(height: 12),
+              const LText(
+                '단순변심 반품은 수령 후 7일 이내이며 미착용·훼손 없음·구성품과 포장 유지 조건을 확인합니다. 구매확정된 주문은 반품할 수 없습니다.',
+              ),
+              const SizedBox(height: 12),
+              const LText('직원이 접수한 후 본사 검수 결과를 반품·환불 내역에서 확인할 수 있습니다.'),
+            ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const LText('닫기'),
-            ),
-            FilledButton(
-              onPressed: quantities.isEmpty
-                  ? null
-                  : () => Navigator.pop(context, true),
-              child: const LText('신청'),
-            ),
-          ],
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const LText('확인'),
+          ),
+        ],
       ),
     );
-    if (confirmed != true) return;
-    final repository = store.orderRepository;
-    if (repository is! ApiOrderRepository) {
-      onMessage('서버 연결이 필요합니다.');
-      return;
-    }
-    try {
-      await repository.requestReturn(
-        order,
-        '고객 단순변심 선택 반품',
-        quantities: quantities,
-      );
-      onMessage('반품 신청이 접수되었습니다. 대리점 검수를 기다려주세요.');
-    } catch (error) {
-      onMessage('반품 신청 실패: $error');
-    }
   }
 
   void _detail(BuildContext context, StoreOrder order) => showDialog<void>(

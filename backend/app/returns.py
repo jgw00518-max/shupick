@@ -151,28 +151,4 @@ def quote_return(return_id: int, current: CurrentCustomer = Depends(get_current_
 
 @router.post('/orders/{order_id}/returns', status_code=201)
 def request_return(order_id: int, request: ReturnRequest, current: CurrentCustomer = Depends(get_current_customer)):
-    with mysql_connection() as connection:
-        with connection.cursor() as cursor:
-            cursor.execute('SELECT * FROM orders WHERE order_id=%s AND customer_id=%s FOR UPDATE', (order_id,current.customer_id))
-            order = cursor.fetchone()
-            if order is None: raise HTTPException(404, 'Order not found')
-            if order['purchase_confirmed_at'] is not None:
-                raise HTTPException(409, '구매확정된 주문은 반품할 수 없습니다.')
-            if order['order_status'] != 'COMPLETED': raise HTTPException(409, '수령 완료 주문만 반품 가능합니다.')
-            cursor.execute('SELECT picked_up_at FROM pickups WHERE order_id=%s', (order_id,))
-            pickup = cursor.fetchone()
-            validate_return(request, None if pickup is None else pickup['picked_up_at'])
-            cursor.execute("SELECT return_request_id FROM return_requests WHERE order_id=%s AND request_status NOT IN ('REJECTED','CANCELED')", (order_id,))
-            if cursor.fetchone() is not None: raise HTTPException(409, '이미 접수된 반품이 있습니다.')
-            cursor.execute("""SELECT oi.order_item_id,oi.quantity,
-                CONCAT(v.product_id,'-',oi.size_mm,'-',oi.color_name) AS item_key
-                FROM order_items oi JOIN product_variants v ON v.product_variant_id=oi.product_variant_id
-                WHERE oi.order_id=%s""", (order_id,))
-            selected = select_return_items(cursor.fetchall(), request.items)
-            cursor.execute("""INSERT INTO return_requests
-                (order_id,customer_id,branch_id,return_reason,return_reason_code,return_deadline_at)
-                VALUES (%s,%s,%s,%s,%s,%s)""", (order_id,current.customer_id,order['pickup_branch_id'],request.reason,request.reasonCode,pickup['picked_up_at']+timedelta(days=7)))
-            identifier = cursor.lastrowid
-            cursor.executemany('INSERT INTO return_items (return_request_id,order_item_id,quantity) VALUES (%s,%s,%s)', [(identifier,item_id,quantity) for item_id,quantity in selected])
-        connection.commit()
-        return {'id':identifier,'status':'REQUESTED'}
+    raise HTTPException(403, '반품은 수령한 대리점에 방문하여 직원에게 접수해주세요.')

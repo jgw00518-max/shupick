@@ -94,7 +94,7 @@ def staff_requisitions(employee: CurrentEmployee = Depends(get_current_employee)
                               pr.branch_id,pr.title,pr.reason,pr.requisition_status,
                               pr.created_at,b.branch_name,e.employee_name
                        FROM purchase_requisitions pr
-                       JOIN branches b ON b.branch_id=pr.branch_id
+                       LEFT JOIN branches b ON b.branch_id=pr.branch_id
                        JOIN employees e ON e.employee_id=pr.requested_by_employee_id
                        ORDER BY pr.created_at DESC,pr.purchase_requisition_id DESC LIMIT 100"""
                 )
@@ -314,10 +314,10 @@ def staff_analytics(
         raise
     except MySQLError as error:
         raise HTTPException(status_code=503, detail="Database unavailable") from error
-    return {"days": days, "orderCount": summary["order_count"], "revenue": summary["revenue"],
+    return {"days": days, "orderCount": int(summary["order_count"]), "revenue": int(summary["revenue"]),
             "quantity": sum(int(row["quantity"]) for row in by_day),
-            "byDay": [{"day": row["day"].isoformat(), "quantity": row["quantity"]} for row in by_day],
+            "byDay": [{"day": row["day"].isoformat(), "quantity": int(row["quantity"])} for row in by_day],
             "byProduct": [{"productId": row["product_id"], "productName": row["product_name"],
-                           "quantity": row["quantity"]} for row in by_product],
+                           "quantity": int(row["quantity"])} for row in by_product],
             "products": [{"id": row["product_id"], "name": row["product_name"]} for row in products],
             "branches": [{"id": row["branch_id"], "name": row["branch_name"]} for row in branches]}

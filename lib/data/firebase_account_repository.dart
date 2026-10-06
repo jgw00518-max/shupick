@@ -357,10 +357,30 @@ class FirebaseAccountRepository
       await _syncCustomerProfile();
 
       return true;
-    } on GoogleSignInException {
-      return false;
-    } on FirebaseAuthException {
-      return false;
+    } on GoogleSignInException catch (error) {
+      if (error.code == GoogleSignInExceptionCode.canceled) return false;
+      final guidance =
+          {
+            GoogleSignInExceptionCode.clientConfigurationError,
+            GoogleSignInExceptionCode.providerConfigurationError,
+          }.contains(error.code)
+          ? 'Firebase의 Google 로그인과 Android SHA 등록을 확인해주세요.'
+          : 'Google 인증을 완료하지 못했습니다. 네트워크와 Google 계정을 확인해주세요.';
+      throw StateError('$guidance [GOOGLE:${error.code.name}]');
+    } on FirebaseAuthException catch (error) {
+      const known = {
+        'operation-not-allowed',
+        'invalid-credential',
+        'account-exists-with-different-credential',
+        'user-disabled',
+        'network-request-failed',
+        'invalid-api-key',
+        'app-not-authorized',
+      };
+      final code = known.contains(error.code) ? error.code : 'unknown';
+      throw StateError(
+        'Firebase Google 인증 설정을 확인해주세요. [GOOGLE_FIREBASE:$code]',
+      );
     } on StateError {
       rethrow;
     } catch (_) {

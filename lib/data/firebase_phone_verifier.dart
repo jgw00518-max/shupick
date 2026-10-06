@@ -34,21 +34,43 @@ class FirebasePhoneVerifier implements PhoneVerifier {
 
   bool _active(int generation) => !_closed && generation == _generation;
 
-  String _message(FirebaseAuthException error) => switch (error.code) {
-    'invalid-verification-code' => '인증번호가 올바르지 않습니다.',
-    'session-expired' ||
-    'invalid-verification-id' => '인증번호가 만료되었습니다. 다시 요청해주세요.',
-    'too-many-requests' ||
-    'quota-exceeded' => '문자 요청 한도를 초과했습니다. 잠시 후 다시 시도해주세요.',
-    'operation-not-allowed' ||
-    'billing-not-enabled' ||
-    'configuration-not-found' => 'Firebase 전화번호 인증 설정과 문자 발송 요금제를 확인해주세요.',
-    'app-not-authorized' ||
-    'invalid-app-credential' ||
-    'missing-client-identifier' => 'Firebase Android 앱 인증 설정(SHA 인증서)을 확인해주세요.',
-    'network-request-failed' => '네트워크 연결을 확인해주세요.',
-    _ => '휴대폰 인증을 완료하지 못했습니다. 설정을 확인하고 다시 시도해주세요.',
-  };
+  String _message(FirebaseAuthException error) {
+    final message = switch (error.code) {
+      'invalid-verification-code' => '인증번호가 올바르지 않습니다.',
+      'session-expired' ||
+      'invalid-verification-id' => '인증번호가 만료되었습니다. 다시 요청해주세요.',
+      'too-many-requests' ||
+      'quota-exceeded' => '문자 요청 한도를 초과했습니다. 잠시 후 다시 시도해주세요.',
+      'operation-not-allowed' ||
+      'billing-not-enabled' ||
+      'configuration-not-found' => 'Firebase 전화번호 인증 설정과 문자 발송 요금제를 확인해주세요.',
+      'app-not-authorized' ||
+      'invalid-app-credential' ||
+      'missing-client-identifier' =>
+        'Firebase Android 앱 인증 설정(SHA 인증서)을 확인해주세요.',
+      'network-request-failed' => '네트워크 연결을 확인해주세요.',
+      _ => '휴대폰 인증을 완료하지 못했습니다. 설정을 확인하고 다시 시도해주세요.',
+    };
+    const known = {
+      'invalid-verification-code',
+      'session-expired',
+      'invalid-verification-id',
+      'too-many-requests',
+      'quota-exceeded',
+      'operation-not-allowed',
+      'billing-not-enabled',
+      'configuration-not-found',
+      'app-not-authorized',
+      'invalid-app-credential',
+      'missing-client-identifier',
+      'network-request-failed',
+      'captcha-check-failed',
+      'invalid-phone-number',
+      'app-not-verified',
+    };
+    final code = known.contains(error.code) ? error.code : 'unknown';
+    return '$message [SMS:$code]';
+  }
 
   @override
   Future<void> sendCode(
