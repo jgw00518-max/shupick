@@ -22,6 +22,13 @@ class Settings:
     firebase_project_id: str = os.getenv("FIREBASE_PROJECT_ID", "")
     firebase_credentials_path: str = os.getenv("FIREBASE_CREDENTIALS_PATH", "")
     outbox_worker_secret: str = os.getenv("OUTBOX_WORKER_SECRET", "")
+    # Social provider secrets stay on the server, never in Flutter assets.
+    kakao_app_id: int = int(os.getenv("KAKAO_APP_ID", "0"))
+    naver_client_id: str = os.getenv("NAVER_CLIENT_ID", "")
+    naver_client_secret: str = os.getenv("NAVER_CLIENT_SECRET", "")
+    naver_redirect_uri: str = os.getenv(
+        "NAVER_REDIRECT_URI", "http://10.0.2.2:8000/auth/social/naver/callback"
+    )
 
 
 settings = Settings()

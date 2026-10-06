@@ -72,7 +72,9 @@ class _ProductCardState extends State<ProductCard> {
               top: 6,
               child: IconButton(
                 tooltip: '찜',
-                onPressed: () => widget.store.toggleWish(widget.product),
+                onPressed: widget.store.shoppingReady
+                    ? () => widget.store.toggleWish(widget.product)
+                    : null,
                 icon: Icon(
                   widget.store.wishedIds.contains(widget.product.id)
                       ? Icons.favorite

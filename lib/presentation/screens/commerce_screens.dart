@@ -973,10 +973,12 @@ class OrdersScreen extends StatelessWidget {
       ),
       if (store.ordersLoading) const LinearProgressIndicator(),
       if (store.ordersError != null) LText(store.ordersError!),
+      if (store.reviewsError != null) LText(store.reviewsError!),
       if (!store.ordersLoading &&
+          store.accountConnectionError == null &&
           store.ordersError == null &&
           store.orders.isEmpty)
-        const LText('주문 내역이 없습니다. 로그인 후 주문을 확인해주세요.'),
+        LText(store.isLoggedIn ? '아직 주문한 내역이 없습니다.' : '로그인 후 주문 내역을 확인해주세요.'),
       const LText('주문과 배송 상태를 확인하세요.'),
       const SizedBox(height: 16),
       for (final order in store.orders)

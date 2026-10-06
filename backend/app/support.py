@@ -1,7 +1,7 @@
 """Owned inquiries and SKU-specific restock subscriptions."""
 from typing import Literal
 from fastapi import APIRouter,Depends,HTTPException
-from pydantic import BaseModel,Field
+from pydantic import BaseModel,Field,field_validator
 from .auth import CurrentCustomer,CurrentEmployee,get_current_customer,require_permission
 from .database import mysql_connection
 
@@ -42,6 +42,11 @@ def create_inquiry(request:InquiryRequest,customer:CurrentCustomer=Depends(get_c
 
 class AnswerRequest(BaseModel):
     answer:str=Field(min_length=1,max_length=10000)
+
+    @field_validator('answer',mode='before')
+    @classmethod
+    def strip_answer(cls,value):
+        return value.strip() if isinstance(value,str) else value
 
 @router.post('/inquiries/{inquiry_id}/answer')
 def answer_inquiry(inquiry_id:int,request:AnswerRequest,employee:CurrentEmployee=Depends(require_permission('SUPPORT_MANAGE'))):

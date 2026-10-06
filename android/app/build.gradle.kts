@@ -1,3 +1,5 @@
+import java.util.Base64
+
 plugins {
     id("com.android.application")
     // START: FlutterFire Configuration
@@ -5,6 +7,19 @@ plugins {
     // END: FlutterFire Configuration
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+}
+
+// Native app keys are supplied through the same local dart-define file as Dart.
+val socialDartDefines = (project.findProperty("dart-defines") as? String)
+    ?.split(",")
+    ?.mapNotNull { encoded ->
+        runCatching { String(Base64.getDecoder().decode(encoded), Charsets.UTF_8) }.getOrNull()
+    }
+    ?.associate { definition -> definition.substringBefore("=") to definition.substringAfter("=", "") }
+    ?: emptyMap()
+val kakaoNativeAppKey = socialDartDefines["KAKAO_NATIVE_APP_KEY"].orEmpty()
+require(kakaoNativeAppKey.isEmpty() || kakaoNativeAppKey.matches(Regex("[A-Fa-f0-9]{32}"))) {
+    "KAKAO_NATIVE_APP_KEY must be a native app key (32 hexadecimal characters)."
 }
 
 android {
@@ -26,6 +41,7 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        manifestPlaceholders["kakaoScheme"] = "kakao" + kakaoNativeAppKey.ifEmpty { "unconfigured" }
     }
 
     buildTypes {

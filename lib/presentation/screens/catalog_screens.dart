@@ -518,7 +518,9 @@ class ProductCollectionScreen extends StatelessWidget {
                     ),
                     if (canRemove)
                       TextButton(
-                        onPressed: () => store.toggleWish(product),
+                        onPressed: store.shoppingReady
+                            ? () => store.toggleWish(product)
+                            : null,
                         child: const LText('삭제'),
                       ),
                   ],

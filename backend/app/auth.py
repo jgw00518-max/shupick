@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from collections.abc import Callable
 from typing import Any
+import logging
+import re
 
 import firebase_admin
 from fastapi import APIRouter, Depends, HTTPException
@@ -14,11 +16,41 @@ from pymysql import MySQLError
 
 from .config import settings
 from .database import mysql_connection
-from .schemas import CustomerProfileResponse, CustomerProfileSyncRequest
+from .schemas import CustomerProfileResponse, CustomerProfileSyncRequest, EmployeeProfileResponse
 
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 bearer_scheme = HTTPBearer(auto_error=False)
+logger = logging.getLogger("uvicorn.error")
+# Firebase permits at most 60 seconds. Keep the tolerance bounded to 30 seconds;
+# signature, project, expiry (with this tolerance), and revocation checks remain enabled.
+FIREBASE_CLOCK_SKEW_SECONDS = 30
+
+
+def _token_error_reason(error: Exception) -> str:
+    """Classify verification failures without logging tokens or exception text."""
+    error_type = type(error).__name__
+    known_errors = {
+        "ExpiredIdTokenError": "expired_token",
+        "RevokedIdTokenError": "revoked_token",
+        "UserDisabledError": "disabled_user",
+        "UserNotFoundError": "user_not_found",
+        "CertificateFetchError": "certificate_fetch_failed",
+        "TenantIdMismatchError": "tenant_mismatch",
+        "PermissionDeniedError": "server_permission_denied",
+    }
+    if error_type in known_errors:
+        return known_errors[error_type]
+    message = str(error).lower()
+    if "used too early" in message or "not yet valid" in message or "issued in the future" in message:
+        return "token_issued_in_future"
+    if 'incorrect "aud"' in message or "audience" in message:
+        return "project_mismatch"
+    if 'incorrect "iss"' in message or "issuer" in message:
+        return "issuer_mismatch"
+    if "signature" in message:
+        return "invalid_signature"
+    return "invalid_token"
 
 
 @dataclass(frozen=True)
@@ -36,7 +68,7 @@ class CurrentCustomer:
 
     customer_id: int
     firebase_uid: str
-    email: str
+    email: str | None
 
 
 @dataclass(frozen=True)
@@ -71,16 +103,34 @@ def verify_firebase_identity(
     """Verify a client Firebase ID token and expose its stable UID."""
 
     if authorization is None or authorization.scheme.lower() != "bearer":
+        logger.warning("Firebase auth rejected: reason=missing_bearer_token")
         raise HTTPException(status_code=401, detail="Firebase ID token is required")
     try:
         decoded: dict[str, Any] = auth.verify_id_token(
             authorization.credentials,
             app=get_firebase_app(),
             check_revoked=True,
+            clock_skew_seconds=FIREBASE_CLOCK_SKEW_SECONDS,
         )
     except HTTPException:
         raise
     except (FirebaseError, ValueError) as error:
+        reason = _token_error_reason(error)
+        logger.warning(
+            "Firebase auth rejected: reason=%s error_type=%s",
+            reason,
+            type(error).__name__,
+        )
+        if reason == "token_issued_in_future":
+            # Only extract numeric clock information, never log the JWT or raw error.
+            match = re.search(r"Token used too early, (\d{1,12}) < (\d{1,12})", str(error))
+            offset = int(match[2]) - int(match[1]) if match else "unknown"
+            logger.warning(
+                "Firebase clock mismatch: token_ahead_seconds=%s allowed_seconds=%s; "
+                "synchronize the server clock if this persists",
+                offset,
+                FIREBASE_CLOCK_SKEW_SECONDS,
+            )
         raise HTTPException(status_code=401, detail="Invalid or expired Firebase ID token") from error
 
     uid = decoded.get("uid") or decoded.get("sub")
@@ -113,7 +163,7 @@ def get_current_customer(
     return CurrentCustomer(
         customer_id=int(row["customer_id"]),
         firebase_uid=str(row["firebase_uid"]),
-        email=str(row["email"]),
+        email=None if row["email"] is None else str(row["email"]),
     )
 
 
@@ -181,7 +231,7 @@ def _profile_response(row: dict[str, Any]) -> CustomerProfileResponse:
     return CustomerProfileResponse(
         customerId=int(row["customer_id"]),
         firebaseUid=str(row["firebase_uid"]),
-        email=str(row["email"]),
+        email=None if row["email"] is None else str(row["email"]),
         customerName=str(row["customer_name"]),
         phone=row["phone"],
         birthDate=None if row["birth_date"] is None else str(row["birth_date"]),
@@ -207,6 +257,8 @@ def sync_customer_profile(
                         cursor.execute("SELECT * FROM customers WHERE email=%s FOR UPDATE", (identity.email,))
                         email_customer = cursor.fetchone()
                         if email_customer is not None:
+                            if request.ensureOnly and email_customer["deleted_at"] is not None:
+                                raise HTTPException(status_code=409, detail="Customer profile is deleted")
                             if not identity.email_verified:
                                 raise HTTPException(status_code=409, detail="Verified email is required to link an existing profile")
                             if not str(email_customer["firebase_uid"]).startswith("legacy-customer-"):
@@ -218,8 +270,11 @@ def sync_customer_profile(
                                 WHERE customer_id=%s
                                 """,
                                 (
-                                    identity.uid, request.customerName, request.phone,
-                                    request.birthDate, email_customer["customer_id"],
+                                    identity.uid,
+                                    email_customer["customer_name"] if request.ensureOnly else request.customerName,
+                                    email_customer["phone"] if request.ensureOnly else request.phone,
+                                    email_customer["birth_date"] if request.ensureOnly else request.birthDate,
+                                    email_customer["customer_id"],
                                 ),
                             )
                             customer_id = int(email_customer["customer_id"])
@@ -239,14 +294,17 @@ def sync_customer_profile(
                             )
                     else:
                         customer_id = int(customer["customer_id"])
-                        cursor.execute(
-                            """
-                            UPDATE customers
-                            SET email=%s,customer_name=%s,phone=%s,birth_date=%s,deleted_at=NULL
-                            WHERE customer_id=%s
-                            """,
-                            (identity.email, request.customerName, request.phone, request.birthDate, customer_id),
-                        )
+                        if request.ensureOnly and customer["deleted_at"] is not None:
+                            raise HTTPException(status_code=409, detail="Customer profile is deleted")
+                        if not request.ensureOnly:
+                            cursor.execute(
+                                """
+                                UPDATE customers
+                                SET email=%s,customer_name=%s,phone=%s,birth_date=%s,deleted_at=NULL
+                                WHERE customer_id=%s
+                                """,
+                                (identity.email, request.customerName, request.phone, request.birthDate, customer_id),
+                            )
                     cursor.execute("SELECT * FROM customers WHERE customer_id=%s", (customer_id,))
                     result = cursor.fetchone()
                 connection.commit()
@@ -272,3 +330,52 @@ def get_my_profile(current: CurrentCustomer = Depends(get_current_customer)) -> 
     except MySQLError as error:
         raise HTTPException(status_code=503, detail="Database unavailable") from error
     return _profile_response(row)
+
+
+@router.get("/employee/me", response_model=EmployeeProfileResponse)
+def get_employee_profile(
+    current: CurrentEmployee = Depends(get_current_employee),
+) -> EmployeeProfileResponse:
+    """Return active roles and current branch assignments for the signed-in employee."""
+
+    try:
+        with mysql_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """SELECT r.role_code,r.role_name
+                    FROM employee_roles er JOIN roles r ON r.role_id=er.role_id
+                    WHERE er.employee_id=%s AND r.is_active=TRUE
+                    ORDER BY r.role_code""",
+                    (current.employee_id,),
+                )
+                roles = cursor.fetchall()
+                cursor.execute(
+                    """SELECT DISTINCT b.branch_id,b.branch_code,b.branch_name,b.district_code
+                    FROM employee_branch_assignments eba
+                    JOIN branches b ON b.branch_id=eba.branch_id
+                    WHERE eba.employee_id=%s AND eba.ended_at IS NULL AND b.is_active=TRUE
+                    ORDER BY b.branch_name,b.branch_id""",
+                    (current.employee_id,),
+                )
+                branches = cursor.fetchall()
+    except MySQLError as error:
+        raise HTTPException(status_code=503, detail="Database unavailable") from error
+
+    if not roles:
+        raise HTTPException(status_code=403, detail="Active employee role is required")
+
+    return EmployeeProfileResponse(
+        employeeId=current.employee_id,
+        employeeCode=current.employee_code,
+        employeeName=current.employee_name,
+        roles=[{"roleCode": row["role_code"], "roleName": row["role_name"]} for row in roles],
+        branches=[
+            {
+                "branchId": int(row["branch_id"]),
+                "branchCode": row["branch_code"],
+                "branchName": row["branch_name"],
+                "districtCode": row["district_code"],
+            }
+            for row in branches
+        ],
+    )

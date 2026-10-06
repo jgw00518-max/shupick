@@ -39,6 +39,29 @@ abstract interface class AccountRepository {
 }
 
 /// 주문 생성과 취소는 추후 MySQL 백엔드 API에서 검증해야 합니다.
+/// 로그인 상태를 복원하고 서버의 고객 연결을 확인할 수 있는 인증 저장소.
+abstract interface class SessionAccountRepository {
+  Future<bool> restoreSession();
+}
+
+/// 이메일이 없는 소셜 사용자도 UID로 로그인과 개인 데이터를 구분합니다.
+abstract interface class IdentityAccountRepository {
+  String? get userId;
+}
+
+/// Presentation-only authentication source, independent of names/contact email.
+enum AccountLoginProvider { email, google, kakao, naver }
+
+abstract interface class LoginProviderAccountRepository {
+  AccountLoginProvider? get loginProvider;
+}
+
+/// 기존 테스트/목업 인증 구현과 분리된 실제 소셜 로그인 경계입니다.
+abstract interface class SocialAccountRepository {
+  Future<bool> signInWithKakao();
+  Future<bool> signInWithNaver();
+}
+
 abstract interface class OrderRepository {
   Future<List<PickupBranch>> getPickupBranches();
   Future<List<StoreOrder>> getOrders();
@@ -72,6 +95,12 @@ abstract interface class CheckoutBenefitsRepository {
 abstract interface class ShoppingRepository {
   Future<ShoppingSnapshot> load(List<Product> products);
   Future<void> save(ShoppingSnapshot snapshot);
+}
+
+/// Selects device-local shopping data by Firebase UID, never by contact email.
+/// Selection is synchronous; each load/save must capture its selected owner.
+abstract interface class AccountScopedShoppingRepository {
+  void selectAccount(String? userId);
 }
 
 /// 로컬 쇼핑 상태와 별도로 고객 행동을 분석용 서버 원장에 전송합니다.
