@@ -36,6 +36,13 @@ class ProductOptionResponse(BaseModel):
     inventoryStatus: str
 
 
+class ProductRecommendationsResponse(BaseModel):
+    """Ranked products with aggregate-view recommendations identified separately."""
+
+    products: list[ProductResponse]
+    coViewedProductIds: list[int] = Field(default_factory=list)
+
+
 class PickupBranchResponse(BaseModel):
     """Active branch available for customer pickup."""
 

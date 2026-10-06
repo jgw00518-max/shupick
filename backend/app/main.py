@@ -18,6 +18,7 @@ from .outbox import router as outbox_router
 from .points import router as points_router
 from .procurement import audit_router, router as procurement_router
 from .products import router as products_router
+from .recommendations import router as recommendations_router
 from .refunds import router as refunds_router
 from .returns import router as returns_router
 from .reviews import router as reviews_router
@@ -40,6 +41,7 @@ app.include_router(staff_work_router)
 app.include_router(branches_router)
 app.include_router(benefits_router)
 app.include_router(products_router)
+app.include_router(recommendations_router)
 app.include_router(refunds_router)
 app.include_router(returns_router)
 app.include_router(reviews_router)

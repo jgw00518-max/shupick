@@ -32,7 +32,7 @@ void main() {
     );
     expect(find.text('실제 성동 대리점'), findsOneWidget);
     expect(find.text('대리점 연락처 · 02-1234-5678'), findsOneWidget);
-    expect(find.text('월요일 · 10:00:00–19:00:00'), findsOneWidget);
+    expect(find.text('월요일 · 10:00 - 19:00'), findsOneWidget);
     expect(find.text('일요일 · 휴무'), findsOneWidget);
     expect(find.textContaining('목업'), findsNothing);
   });

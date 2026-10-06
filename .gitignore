@@ -416,3 +416,7 @@ app.*.map.json
 # Social provider configuration is local to each developer.
 social-login.local.json
 ios/Flutter/SocialLogin.local.xcconfig
+social-login.json
+
+# Local catalog import rollback snapshots.
+/backend/.local/

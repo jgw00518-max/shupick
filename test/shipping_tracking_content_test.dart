@@ -99,7 +99,7 @@ void main() {
     await tester.tap(find.text('코드 복사'));
     await tester.pumpAndSettle();
     expect(copied, code);
-    await tester.ensureVisible(find.text('10:00 – 19:00'));
+    await tester.ensureVisible(find.text('10:00 - 19:00'));
     expect(find.text('휴무'), findsOneWidget);
     await tester.ensureVisible(find.text('상태 변경 이력'));
     expect(tester.takeException(), isNull);

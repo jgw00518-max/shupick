@@ -5,6 +5,56 @@ import 'package:http/testing.dart';
 import 'package:shupick/data/api_product_repository.dart';
 
 void main() {
+  test('추천 응답의 한글 상품과 서버 순서·공동 조회 여부를 변환한다', () async {
+    final repository = ApiProductRepository(
+      baseUrl: 'http://test',
+      client: MockClient((request) async {
+        expect(request.url.path, '/products/91/recommendations');
+        final product = {
+          'name': '추천 러너',
+          'category': '스포츠',
+          'price': 89000,
+          'imageUrl': '',
+          'color': '블랙',
+          'gender': '공용',
+          'middleCategory': '스포츠',
+          'subcategory': '러닝화',
+          'images': <String, String>{},
+          'reviewCount': 0,
+          'salesCount': 0,
+        };
+        return http.Response.bytes(
+          utf8.encode(
+            jsonEncode({
+              'products': [
+                {...product, 'id': 300},
+                {...product, 'id': 200},
+              ],
+              'coViewedProductIds': [300],
+            }),
+          ),
+          200,
+        );
+      }),
+    );
+    final result = await repository.getRecommendations(91);
+    expect(result.products.map((p) => p.id), [300, 200]);
+    expect(result.products.first.name, '추천 러너');
+    expect(result.coViewedProductIds, {300});
+    expect(result.hasCustomerViews, isTrue);
+  });
+
+  test('추천 API 오류를 전달하여 상위 계층에서 유사 상품으로 대체할 수 있다', () async {
+    final repository = ApiProductRepository(
+      baseUrl: 'http://test',
+      client: MockClient((_) async => http.Response('unavailable', 503)),
+    );
+    expect(
+      repository.getRecommendations(91),
+      throwsA(isA<ApiProductException>()),
+    );
+  });
+
   test('MySQL 분류와 브랜드별 상품 ID를 변환한다', () async {
     final repository = ApiProductRepository(
       baseUrl: 'http://test',

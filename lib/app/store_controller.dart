@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import '../domain/models.dart';
 import '../domain/repositories.dart';
 import '../domain/customer_enrollment.dart';
+import '../domain/product_recommendations.dart';
 
 /// 화면 상태를 관리하며 저장과 조회는 Repository에 위임합니다.
 class StoreController extends GetxController {
@@ -324,6 +325,32 @@ class StoreController extends GetxController {
   /// 상세 화면이 선택한 상품의 최신 색상·사이즈 재고를 요청합니다.
   Future<List<ProductOption>> getProductOptions(int productId) =>
       productsRepository.getProductOptions(productId);
+
+  ProductRecommendations similarRecommendations(Product product) =>
+      ProductRecommendations(products: similarProducts(product, products));
+
+  Future<ProductRecommendations> getRecommendations(Product product) async {
+    final repository = productsRepository;
+    if (repository is ProductRecommendationRepository) {
+      try {
+        final result = await (repository as ProductRecommendationRepository)
+            .getRecommendations(product.id);
+        final distinct = <int, Product>{
+          for (final candidate in result.products)
+            if (candidate.id != product.id) candidate.id: candidate,
+        }.values.take(4).toList();
+        return ProductRecommendations(
+          products: distinct,
+          coViewedProductIds: result.coViewedProductIds.intersection(
+            distinct.map((item) => item.id).toSet(),
+          ),
+        );
+      } catch (_) {
+        // 상세 화면은 연결 오류가 있어도 현재 카탈로그로 계속 탐색할 수 있습니다.
+      }
+    }
+    return similarRecommendations(product);
+  }
 
   Future<List<PickupBranch>> getPickupBranches() =>
       orderRepository.getPickupBranches();

@@ -17,13 +17,37 @@ String get defaultApiBaseUrl {
 }
 
 /// FastAPI 상품 JSON을 앱의 상품·옵션 모델로 변환합니다.
-class ApiProductRepository implements ProductRepository, CatalogRepository {
+class ApiProductRepository
+    implements
+        ProductRepository,
+        CatalogRepository,
+        ProductRecommendationRepository {
   ApiProductRepository({http.Client? client, String? baseUrl})
     : _client = client ?? http.Client(),
       _baseUrl = (baseUrl ?? defaultApiBaseUrl).replaceFirst(RegExp(r'/$'), '');
 
   final http.Client _client;
   final String _baseUrl;
+
+  @override
+  Future<ProductRecommendations> getRecommendations(int productId) async {
+    final response = await _client
+        .get(Uri.parse('$_baseUrl/products/$productId/recommendations'))
+        .timeout(const Duration(seconds: 10));
+    if (response.statusCode != 200) {
+      throw ApiProductException('추천 상품 조회 실패 (${response.statusCode})');
+    }
+    final json =
+        jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+    return ProductRecommendations(
+      products: (json['products'] as List)
+          .map((item) => _productFromJson(item as Map<String, dynamic>))
+          .toList(growable: false),
+      coViewedProductIds: (json['coViewedProductIds'] as List)
+          .cast<int>()
+          .toSet(),
+    );
+  }
 
   @override
   Future<CatalogMetadata> getCatalog() async {

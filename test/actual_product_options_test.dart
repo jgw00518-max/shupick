@@ -69,6 +69,9 @@ void main() {
   }
 
   http.Client client() => MockClient((request) async {
+    if (request.url.path.endsWith('/recommendations')) {
+      return http.Response('{"products":[],"coViewedProductIds":[]}', 200);
+    }
     expect(request.url.path, '/products/91/options');
     return http.Response(
       jsonEncode([

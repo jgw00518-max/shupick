@@ -1,5 +1,10 @@
 // Higgsfield locale.tsx의 공개 목업 문구를 Flutter에서 공유합니다.
 const englishDictionary = <String, String>{
+  "이 상품을 본 고객이 많이 찾아본 상품": "Customers who viewed this also explored",
+  "함께 둘러보기 좋은 상품": "More products to explore",
+  "함께 조회된 상품을 먼저 보여드려요.": "Products viewed together appear first.",
+  "종류와 가격이 비슷한 상품을 골랐어요.": "Explore similar styles and prices.",
+  "다른 추천 상품을 준비하고 있어요.": "More recommendations are on the way.",
   "현재 등급": "Current tier",
   "이름을 입력해주세요.": "Enter your name.",
   "이름은 100자 이내로 입력해주세요.": "Enter a name of 100 characters or fewer.",

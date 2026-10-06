@@ -7,6 +7,7 @@ import '../../domain/models.dart';
 import '../shared/store_widgets.dart';
 import '../shared/order_history_card.dart';
 import '../shared/cart_item_options.dart';
+import '../shared/branch_hours.dart';
 import 'review_sheet.dart';
 
 const pickupDistricts = [
@@ -553,7 +554,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             items:
                 (branches.isEmpty
                         ? [district]
-                        : branches.map((item) => item.districtName).toSet())
+                        : (branches
+                              .map((item) => item.districtName)
+                              .toSet()
+                              .toList()
+                            ..sort()))
                     .map(
                       (value) =>
                           DropdownMenuItem(value: value, child: LText(value)),
@@ -776,7 +781,7 @@ class PickupStoreInfo extends StatelessWidget {
                     ? '휴무'
                     : hour['opensAt'] == null || hour['closesAt'] == null
                     ? '운영시간 미등록'
-                    : '${hour['opensAt']}–${hour['closesAt']}'}',
+                    : '${branchTime(hour['opensAt'])} - ${branchTime(hour['closesAt'])}'}',
               ),
           ],
         ),

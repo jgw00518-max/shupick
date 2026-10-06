@@ -7,6 +7,7 @@ import '../../app/store_controller.dart';
 import '../../domain/models.dart';
 import '../shared/store_widgets.dart';
 import '../shared/rating_stars.dart';
+import '../shared/product_recommendation_section.dart';
 import 'review_sheet.dart';
 import '../../data/api_review_repository.dart';
 import 'public_reviews.dart';
@@ -209,36 +210,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     loadPublicReviews();
   }
 
-  List<Product> get recommendations {
-    const next = <int, List<int>>{
-      1: [5, 6, 16, 2],
-      2: [7, 9, 3, 1],
-      3: [12, 13, 2, 11],
-      4: [14, 15, 16, 5],
-      5: [1, 6, 17, 16],
-    };
-    final ids = next[widget.product.id];
-    if (ids != null) {
-      final matched = ids
-          .map(
-            (id) => widget.store.products
-                .where((product) => product.id == id)
-                .firstOrNull,
-          )
-          .whereType<Product>()
-          .toList();
-      if (matched.isNotEmpty) return matched;
-    }
-    return widget.store.products
-        .where(
-          (p) =>
-              p.id != widget.product.id &&
-              p.category == widget.product.category,
-        )
-        .take(4)
-        .toList();
-  }
-
   Future<void> openOptions() async {
     await showModalBottomSheet<void>(
       context: context,
@@ -424,76 +395,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 ),
               ),
               const Divider(height: 1),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(18, 22, 18, 22),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Expanded(
-                          child: LText(
-                            '이 상품을 본 고객이 다음으로 본 상품',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                        const Icon(Icons.arrow_forward, size: 16),
-                      ],
-                    ),
-                    const SizedBox(height: 5),
-                    LText(
-                      '예시 탐색 데이터 기반 추천',
-                      style: TextStyle(fontSize: 14, color: muted),
-                    ),
-                    const SizedBox(height: 13),
-                    SizedBox(
-                      height: 157,
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: recommendations.length,
-                        separatorBuilder: (_, _) => const SizedBox(width: 10),
-                        itemBuilder: (context, index) {
-                          final product = recommendations[index];
-                          return SizedBox(
-                            width: 104,
-                            child: InkWell(
-                              onTap: () => widget.onOpenProduct(product),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(10),
-                                    child: ProductImage(product, height: 104),
-                                  ),
-                                  const SizedBox(height: 7),
-                                  LText(
-                                    product.name,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  LText(
-                                    won(product.price),
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: muted,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                ),
+              ProductRecommendationSection(
+                product: widget.product,
+                store: widget.store,
+                onOpenProduct: widget.onOpenProduct,
               ),
               const Divider(height: 1),
               Row(

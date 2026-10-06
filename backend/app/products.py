@@ -13,7 +13,7 @@ from .schemas import ProductOptionResponse, ProductResponse
 router = APIRouter(prefix="/products", tags=["products"])
 
 
-PRODUCT_LIST_SQL = """
+PRODUCT_LIST_BASE_SQL = """
 SELECT
   p.product_id,
   p.product_name,
@@ -72,8 +72,9 @@ JOIN (
   WHERE is_active = TRUE
 ) colors ON colors.product_id = p.product_id
 WHERE p.is_active = TRUE
-ORDER BY p.product_id, colors.color_code
 """
+
+PRODUCT_LIST_SQL = PRODUCT_LIST_BASE_SQL + "\nORDER BY p.product_id, colors.color_code"
 
 PRODUCT_OPTIONS_SQL = """
 SELECT

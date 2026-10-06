@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../localization.dart';
+import 'branch_hours.dart';
 
 String trackingStatusLabel(String status) => switch (status) {
   'PENDING_PAYMENT' => '결제 대기',
@@ -33,13 +34,7 @@ class ShippingTrackingContent extends StatelessWidget {
     return '${parsed.year}.${two(parsed.month)}.${two(parsed.day)}  ${two(parsed.hour)}:${two(parsed.minute)}';
   }
 
-  String time(Object? value) {
-    if (value == null) return '—';
-    final parts = value.toString().split(':');
-    return parts.length >= 2
-        ? '${parts[0].padLeft(2, '0')}:${parts[1]}'
-        : value.toString();
-  }
+  String time(Object? value) => branchTime(value);
 
   @override
   Widget build(BuildContext context) {
@@ -290,7 +285,7 @@ class ShippingTrackingContent extends StatelessWidget {
                       LText(
                         hour['is_closed'] == 1 || hour['is_closed'] == true
                             ? '휴무'
-                            : '${time(hour['opens_at'])} – ${time(hour['closes_at'])}',
+                            : '${time(hour['opens_at'])} - ${time(hour['closes_at'])}',
                         style: theme.textTheme.bodyMedium,
                       ),
                     ],

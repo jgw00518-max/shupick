@@ -205,7 +205,7 @@ class _PhoneEnrollmentFieldsState extends State<PhoneEnrollmentFields> {
                 if (!_consent) _clearProof();
               }),
         title: const LText(
-          '휴대폰 인증을 위한 Google 전송·저장과 SHUPICK의 인증된 복구용 번호 저장에 동의합니다.',
+          '휴대폰 인증을 위한 Google 전송·저장과 SHOEPICK의 인증된 복구용 번호 저장에 동의합니다.',
         ),
       ),
       OutlinedButton.icon(

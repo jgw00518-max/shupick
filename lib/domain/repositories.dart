@@ -20,6 +20,10 @@ abstract interface class CatalogRepository {
   Future<CatalogMetadata> getCatalog();
 }
 
+abstract interface class ProductRecommendationRepository {
+  Future<ProductRecommendations> getRecommendations(int productId);
+}
+
 /// 회원 혜택 조회와 구매확정 요청을 제공합니다.
 abstract interface class AccountBenefitsRepository {
   Future<Map<String, dynamic>> getAccountBenefits();

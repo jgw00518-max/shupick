@@ -154,7 +154,7 @@ void _expectLoading(
   String description = '인증과 회원 정보를 확인하고 있어요.',
 }) {
   expect(find.byType(CircularProgressIndicator), findsOneWidget);
-  expect(find.text('SHUPICK'), findsOneWidget);
+  expect(find.text('SHOEPICK'), findsOneWidget);
   expect(
     find.text(language == 'English' ? 'Signing in…' : title),
     findsOneWidget,

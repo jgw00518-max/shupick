@@ -31,6 +31,18 @@ class Product {
       images.isEmpty ? [color, '블랙', '베이지'] : images.keys.toList();
 }
 
+/// 추천 순서와 실제 고객 공동 조회로 선택된 상품을 구분합니다.
+class ProductRecommendations {
+  const ProductRecommendations({
+    required this.products,
+    this.coViewedProductIds = const {},
+  });
+
+  final List<Product> products;
+  final Set<int> coViewedProductIds;
+  bool get hasCustomerViews => coViewedProductIds.isNotEmpty;
+}
+
 /// 서버의 분류 목록과 브랜드별 상품 ID를 탐색 화면에 제공합니다.
 class CatalogMetadata {
   const CatalogMetadata({required this.categories, required this.brands});

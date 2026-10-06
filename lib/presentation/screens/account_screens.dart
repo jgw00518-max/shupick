@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../localization.dart';
 
@@ -7,7 +6,6 @@ import '../../domain/repositories.dart';
 import '../../domain/customer_enrollment.dart';
 import '../store_shell.dart';
 import '../shared/login_provider_badge.dart';
-import '../shared/firestore_access_check_card.dart';
 import '../shared/store_widgets.dart';
 import '../shared/phone_enrollment_fields.dart';
 
@@ -257,10 +255,6 @@ class ProfileScreen extends StatelessWidget {
           subtitle: LText(item.$4),
           trailing: const Icon(Icons.chevron_right),
           onTap: () => onGo(item.$2),
-        ),
-      if (kDebugMode)
-        FirestoreAccessCheckCard(
-          key: ValueKey(store.isLoggedIn ? store.accountIdentityKey : null),
         ),
     ],
   );
@@ -822,7 +816,7 @@ class _AuthLoadingScreen extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             const LText(
-              'SHUPICK',
+              'SHOEPICK',
               style: TextStyle(
                 fontSize: 30,
                 fontWeight: FontWeight.w900,
